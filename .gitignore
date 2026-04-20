@@ -1,0 +1,11 @@
+node_modules
+.vercel
+.DS_Store
+client/build
+.env
+client/.env
+server/.env
+.env
+server/.env
+client/.env
+**/.env

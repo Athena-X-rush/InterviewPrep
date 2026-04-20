@@ -1,0 +1,69 @@
+
+@media (max-width: 1200px) {
+  .topbar {
+    height: auto;
+    flex-wrap: wrap;
+    padding: 10px 20px;
+  }
+
+  .topbar__center {
+    order: 3;
+    width: 100%;
+    justify-content: center;
+    padding-bottom: 8px;
+  }
+
+  .auth-page,
+  .two-panel-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .interview-summary-grid,
+  .results-summary-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .auth-page,
+  .generic-page,
+  .home-shell,
+  .inline-error--wide,
+  .interview-page,
+  .interview-page--wide,
+  .interview-session-page,
+  .quiz-active-page,
+  .quiz-loading-page,
+  .quiz-page,
+  .quiz-results-page {
+    width: calc(100% - 32px);
+  }
+
+  .interview-inline-grid,
+  .interview-mode-grid,
+  .results-summary-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .interview-summary-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .quiz-progress-panel,
+  .quiz-toolbar {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .full-width-cta,
+  .interview-submit,
+  .interview-summary-actions .button {
+    width: 100%;
+    max-width: none;
+  }
+
+  .topbar__actions {
+    flex-wrap: wrap;
+  }
+}
