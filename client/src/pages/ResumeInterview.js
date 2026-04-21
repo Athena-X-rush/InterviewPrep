@@ -1,7 +1,7 @@
-import React, { useContext, useEffect, useRef, useState } from 'react'
+import React, { useContext, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { buildResumeInterviewQuestions } from '../data/interviewBank'
 import { AuthContext } from '../context/AuthContext'
+import api from '../services/api'
 
 const roles = ['Software Engineer', 'Frontend Engineer', 'Backend Engineer', 'Data Analyst', 'Full Stack Engineer']
 const difficulties = ['Easy (Junior)', 'Medium (Mid Level)', 'Hard (Senior Level)']
@@ -11,7 +11,6 @@ const timeOptions = ['1 minute', '2 minutes', '3 minutes']
 const ResumeInterview = () => {
   const { user } = useContext(AuthContext)
   const navigate = useNavigate()
-  const fileInput = useRef(null)
 
   const [form, setForm] = useState({
     role: 'Software Engineer',
@@ -19,9 +18,9 @@ const ResumeInterview = () => {
     questions: '8 Questions',
     timePerQuestion: '2 minutes',
   })
-  const [file, setFile] = useState(null)
-  const [dragging, setDragging] = useState(false)
+  const [resumeText, setResumeText] = useState('')
   const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
 
   const userName = user?.name || 'Learner'
   const questionCount = Number(form.questions.split(' ')[0])
@@ -29,47 +28,43 @@ const ResumeInterview = () => {
 
   const set = (key, val) => setForm((f) => ({ ...f, [key]: val }))
 
-  const pickFile = (picked) => {
-    if (!picked) return
-    if (picked.size > 10 * 1024 * 1024) {
-      setError('File must be under 10MB.')
+  const handleStart = async () => {
+    if (!resumeText || resumeText.trim().length < 50) {
+      setError('Please paste your resume content first (at least 50 characters).')
       return
     }
-    setFile(picked)
+
+    setLoading(true)
     setError('')
-  }
 
-  const onDrop = (e) => {
-    e.preventDefault()
-    setDragging(false)
-    pickFile(e.dataTransfer.files?.[0])
-  }
+    try {
+      const response = await api.post('/ai/generate-resume-questions', {
+        resumeText,
+        role: form.role,
+        difficulty: form.difficulty,
+        questionCount,
+      })
 
-  const handleStart = () => {
-    if (!file) {
-      setError('Upload your resume first.')
-      return
+      const questions = response.data.questions
+
+      navigate('/interview/session', {
+        state: {
+          modeName: 'AI Resume Interview',
+          modeLabel: 'RESUME',
+          metaLabel: `${form.role.toUpperCase()} · ${form.difficulty.toUpperCase()}`,
+          summaryTopic: form.role,
+          summaryDifficulty: form.difficulty,
+          userName: userName.trim() || 'Guest',
+          timePerQuestionSeconds,
+          questions,
+        },
+      })
+    } catch (error) {
+      console.error('Error:', error)
+      setError('Failed to generate questions. Please try again.')
+    } finally {
+      setLoading(false)
     }
-
-    const questions = buildResumeInterviewQuestions({
-      role: form.role,
-      difficulty: form.difficulty,
-      questionCount,
-      fileName: file.name,
-    })
-
-    navigate('/interview/session', {
-      state: {
-        modeName: 'AI Resume Interview',
-        modeLabel: 'RESUME',
-        metaLabel: `${form.role.toUpperCase()} · ${form.difficulty.toUpperCase()}`,
-        summaryTopic: form.role,
-        summaryDifficulty: form.difficulty,
-        userName: userName.trim() || 'Guest',
-        timePerQuestionSeconds,
-        questions,
-      },
-    })
   }
 
   return (
@@ -136,55 +131,21 @@ const ResumeInterview = () => {
 
           {/* Upload panel */}
           <section className="iresume-panel">
-            <h2>Upload resume</h2>
+            <h2>Paste your resume</h2>
 
-            <input
-              ref={fileInput}
-              type="file"
-              accept=".pdf,.doc,.docx"
-              className="visually-hidden"
-              onChange={(e) => pickFile(e.target.files?.[0])}
+            <textarea
+              className="iresume-textarea"
+              value={resumeText}
+              onChange={(e) => setResumeText(e.target.value)}
+              placeholder="Paste your resume content here (skills, experience, projects, etc.)..."
+              rows={15}
+              style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #ddd', fontFamily: 'monospace' }}
             />
-
-            <div
-              className={'iresume-drop' + (dragging ? ' iresume-drop--over' : '') + (file ? ' iresume-drop--filled' : '')}
-              onClick={() => fileInput.current?.click()}
-              onDragOver={(e) => { e.preventDefault(); setDragging(true) }}
-              onDragLeave={() => setDragging(false)}
-              onDrop={onDrop}
-            >
-              {file ? (
-                <>
-                  <span className="iresume-drop__icon">📎</span>
-                  <strong>{file.name}</strong>
-                  <small>{(file.size / 1024).toFixed(0)} KB · Click to change</small>
-                </>
-              ) : (
-                <>
-                  <span className="iresume-drop__icon">☁</span>
-                  <strong>Drop your resume here</strong>
-                  <small>or click to browse · PDF, DOCX · max 10MB</small>
-                </>
-              )}
-            </div>
-
-            {file && (
-              <div className="iresume-file-strip">
-                <span className="iresume-file-strip__name">✓ {file.name}</span>
-                <button
-                  type="button"
-                  className="iresume-file-strip__remove"
-                  onClick={() => setFile(null)}
-                >
-                  Remove
-                </button>
-              </div>
-            )}
 
             <div className="iresume-what">
               <p className="iresume-what__label">What happens next</p>
               <ol className="iresume-steps">
-                <li>Your file is parsed locally in the browser</li>
+                <li>AI analyzes your resume content</li>
                 <li>Questions are generated based on your role &amp; resume</li>
                 <li>Interview starts — answer by typing or speaking</li>
               </ol>
@@ -194,8 +155,13 @@ const ResumeInterview = () => {
 
         {error ? <p className="inline-error inline-error--wide">{error}</p> : null}
 
-        <button type="button" className="button button--primary full-width-cta" onClick={handleStart}>
-          Start resume interview →
+        <button
+          type="button"
+          className="button button--primary full-width-cta"
+          onClick={handleStart}
+          disabled={loading}
+        >
+          {loading ? 'Generating questions...' : 'Start resume interview →'}
         </button>
       </main>
     </div>

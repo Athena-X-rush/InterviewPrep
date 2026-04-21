@@ -1,8 +1,8 @@
 import React, { useContext, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { buildLiveInterviewQuestions } from '../data/interviewBank'
 import { checkCameraAndMic } from '../utils/mediaPermissions'
 import { AuthContext } from '../context/AuthContext'
+import api from '../services/api'
 
 const ModeCard = ({ to, icon, title, desc }) => (
   <Link to={to} className="imode-card">
@@ -28,6 +28,7 @@ const Interview = () => {
   const [devices, setDevices] = useState({ camera: false, microphone: false, message: '' })
   const [error, setError] = useState('')
   const [checking, setChecking] = useState(false)
+  const [loading, setLoading] = useState(false)
 
   const set = (key, val) => setForm((f) => ({ ...f, [key]: val }))
 
@@ -38,7 +39,7 @@ const Interview = () => {
     setChecking(false)
   }
 
-  const handleStart = () => {
+  const handleStart = async () => {
     if (!form.topic.trim()) {
       setError('Enter a topic to continue.')
       return
@@ -48,24 +49,35 @@ const Interview = () => {
       return
     }
 
-    const questions = buildLiveInterviewQuestions({
-      topic: form.topic.trim(),
-      difficulty: form.difficulty,
-      questionCount: form.questions,
-    })
+    setLoading(true)
+    setError('')
 
-    navigate('/interview/session', {
-      state: {
-        modeName: 'Live Topic Interview',
-        modeLabel: 'LIVE',
-        metaLabel: `${form.topic.trim().toUpperCase()} · ${form.difficulty.toUpperCase()}`,
-        summaryTopic: form.topic.trim(),
-        summaryDifficulty: form.difficulty.toLowerCase(),
-        userName: user?.name || 'Learner',
-        timePerQuestionSeconds: Number(form.timePerQuestion),
-        questions,
-      },
-    })
+    try {
+      const response = await api.post('/ai/generate-questions', {
+        topic: form.topic.trim(),
+        difficulty: form.difficulty,
+        questionCount: form.questions,
+      })
+
+      const questions = response.data.questions
+
+      navigate('/interview/session', {
+        state: {
+          modeName: 'Live Topic Interview',
+          modeLabel: 'LIVE',
+          metaLabel: `${form.topic.trim().toUpperCase()} · ${form.difficulty.toUpperCase()}`,
+          summaryTopic: form.topic.trim(),
+          summaryDifficulty: form.difficulty.toLowerCase(),
+          userName: user?.name || 'Learner',
+          timePerQuestionSeconds: Number(form.timePerQuestion),
+          questions,
+        },
+      })
+    } catch (error) {
+      setError('Failed to generate questions. Please try again.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   const bothReady = devices.camera && devices.microphone
@@ -160,8 +172,13 @@ const Interview = () => {
               {devices.message ? <p className="inline-message">{devices.message}</p> : null}
               {error ? <p className="inline-error">{error}</p> : null}
 
-              <button type="button" className="button button--primary interview-submit" onClick={handleStart}>
-                Start interview →
+              <button 
+                type="button" 
+                className="button button--primary interview-submit" 
+                onClick={handleStart}
+                disabled={loading}
+              >
+                {loading ? 'Generating questions...' : 'Start interview →'}
               </button>
             </div>
           </section>

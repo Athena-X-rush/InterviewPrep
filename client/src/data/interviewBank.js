@@ -71,12 +71,11 @@ export const buildResumeInterviewQuestions = ({ role, difficulty, questionCount,
     return template
       .replaceAll('{role}', role)
       .replaceAll('{focus}', focus)
-      .replaceAll('{difficulty}', difficultyTone[difficulty] || difficulty.toLowerCase())
-      .concat(fileName ? ` Reference your uploaded file: ${fileName}.` : '');
+      .replaceAll('{difficulty}', difficultyTone[difficulty] || difficulty.toLowerCase());
   });
 };
 
 export const buildDocumentInterviewQuestions = ({ questionCount, fileName, role }) =>
   takeQuestions(documentTemplates, Number(questionCount), (template) =>
-    `${template}${fileName ? ` Use "${fileName}" as the source document.` : ''}${role ? ` Target role: ${role}.` : ''}`
+    `${template}${role ? ` Target role: ${role}.` : ''}`
   );

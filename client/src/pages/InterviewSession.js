@@ -56,13 +56,13 @@ const pickVoice = () => {
 const speak = (text, muted) => {
   if (muted || !text) return
   window.speechSynthesis.cancel()
-  const utter = new SpeechSynthesisUtterance(text)
-  utter.rate = 0.92
-  utter.pitch = 1.0
+  const speechUtterance = new SpeechSynthesisUtterance(text)
+  speechUtterance.rate = 0.92
+  speechUtterance.pitch = 1.0
   const voice = pickVoice()
-  if (voice) utter.voice = voice
+  if (voice) speechUtterance.voice = voice
   // Small delay lets voices load on first call
-  setTimeout(() => window.speechSynthesis.speak(utter), 120)
+  setTimeout(() => window.speechSynthesis.speak(speechUtterance), 120)
 }
 
 const ScorePill = ({ label, value }) => {
@@ -84,8 +84,8 @@ const InterviewSession = () => {
   const speechRef = useRef(null)
   const threadRef = useRef(null)
 
-  const [idx, setIdx] = useState(0)
-  const [draft, setDraft] = useState('')
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
+  const [answerDraft, setAnswerDraft] = useState('')
   const [timeLeft, setTimeLeft] = useState(session?.timePerQuestionSeconds || 120)
   const [responses, setResponses] = useState([])
   const [status, setStatus] = useState('active')
@@ -102,8 +102,8 @@ const InterviewSession = () => {
   const [loadingFollowUp, setLoadingFollowUp] = useState(false)
   const [isFollowUpMode, setIsFollowUpMode] = useState(false)
 
-  const question = session?.questions?.[idx] || null
-  const progress = session?.questions?.length ? ((idx + 1) / session.questions.length) * 100 : 0
+  const question = session?.questions?.[currentQuestionIndex] || null
+  const progress = session?.questions?.length ? ((currentQuestionIndex + 1) / session.questions.length) * 100 : 0
   const pastResponse = (qid) => responses.find((r) => r.questionId === qid)
 
   // Load voices
@@ -134,18 +134,18 @@ const InterviewSession = () => {
   // Speech recognition setup
   useEffect(() => {
     if (!recognitionApi) return
-    const rec = new recognitionApi()
-    rec.lang = 'en-US'
-    rec.continuous = true
-    rec.interimResults = true
-    rec.onresult = (e) => {
+    const speechRecognizer = new recognitionApi()
+    speechRecognizer.lang = 'en-US'
+    speechRecognizer.continuous = true
+    speechRecognizer.interimResults = true
+    speechRecognizer.onresult = (e) => {
       const text = Array.from(e.results).map((r) => r[0]?.transcript || '').join(' ').trim()
-      setDraft(text)
+      setAnswerDraft(text)
     }
-    rec.onend = () => setRecording(false)
-    rec.onerror = () => { setRecording(false); setHint('Voice not available in this browser.') }
-    speechRef.current = rec
-    return () => rec.stop()
+    speechRecognizer.onend = () => setRecording(false)
+    speechRecognizer.onerror = () => { setRecording(false); setHint('Voice not available in this browser.') }
+    speechRef.current = speechRecognizer
+    return () => speechRecognizer.stop()
   }, [])
 
   // Timer
@@ -167,16 +167,16 @@ const InterviewSession = () => {
   useEffect(() => {
     const el = threadRef.current
     if (el) el.scrollTop = el.scrollHeight
-  }, [idx, submitted, feedback, responses.length, status])
+  }, [currentQuestionIndex, submitted, feedback, responses.length, status])
 
   const summaryMetrics = useMemo(() => {
     if (!responses.length) return { overall: 0, relevance: 0, depth: 0, communication: 0 }
     const totals = responses.reduce(
-      (acc, r) => ({
-        overall: acc.overall + r.metrics.overall,
-        relevance: acc.relevance + r.metrics.relevance,
-        depth: acc.depth + r.metrics.depth,
-        communication: acc.communication + r.metrics.communication,
+      (accumulator, r) => ({
+        overall: accumulator.overall + r.metrics.overall,
+        relevance: accumulator.relevance + r.metrics.relevance,
+        depth: accumulator.depth + r.metrics.depth,
+        communication: accumulator.communication + r.metrics.communication,
       }),
       { overall: 0, relevance: 0, depth: 0, communication: 0 }
     )
@@ -192,7 +192,7 @@ const InterviewSession = () => {
   // Save to backend
   useEffect(() => {
     if (status !== 'complete' || saved || !session?.questions?.length) return
-    let mounted = true
+    let isMounted = true
     const score = Math.max(0, Math.min(100, summaryMetrics.overall * 10))
     api.post('/quiz/submit', {
       score,
@@ -203,8 +203,8 @@ const InterviewSession = () => {
       modeName: session.modeName,
       totalQuestions: session.questions.length,
       correctAnswers: responses.length,
-    }).then(() => { if (mounted) setSaved(true) }).catch(() => {})
-    return () => { mounted = false }
+    }).then(() => { if (isMounted) setSaved(true) }).catch(() => {})
+    return () => { isMounted = false }
   }, [status, saved, session, responses.length, summaryMetrics.overall])
 
   if (!session?.questions?.length) return <Navigate to="/interview" replace />
@@ -224,12 +224,12 @@ const InterviewSession = () => {
   const replayQuestion = () => speak(question?.prompt, false)
 
   const requestFollowUp = async () => {
-    if (!question || !draft) return
+    if (!question || !answerDraft) return
     setLoadingFollowUp(true)
     try {
       const response = await api.post('/ai/follow-up', {
         question: question.prompt,
-        answer: draft,
+        answer: answerDraft,
         topic: session.summaryTopic || session.modeName,
         difficulty: session.summaryDifficulty || 'medium'
       })
@@ -245,9 +245,10 @@ const InterviewSession = () => {
 
   const handleSubmit = async () => {
     if (!question) return
+    window.speechSynthesis.cancel()
     stopRecording()
-    const metrics = scoreAnswer(draft, question.prompt, session.summaryTopic || session.metaLabel)
-    const entry = { questionId: question.id, prompt: question.prompt, answer: draft, metrics }
+    const metrics = scoreAnswer(answerDraft, question.prompt, session.summaryTopic || session.metaLabel)
+    const entry = { questionId: question.id, prompt: question.prompt, answer: answerDraft, metrics }
     setResponses((prev) => {
       const i = prev.findIndex((r) => r.questionId === question.id)
       if (i >= 0) { const next = [...prev]; next[i] = entry; return next }
@@ -262,7 +263,7 @@ const InterviewSession = () => {
     try {
       const response = await api.post('/ai/follow-up', {
         question: question.prompt,
-        answer: draft,
+        answer: answerDraft,
         topic: session.summaryTopic || session.modeName,
         difficulty: session.summaryDifficulty || 'medium'
       })
@@ -277,14 +278,15 @@ const InterviewSession = () => {
   }
 
   const goNext = () => {
-    setDraft('')
+    window.speechSynthesis.cancel()
+    setAnswerDraft('')
     setFeedback(null)
     setSubmitted(false)
     setHint('')
     setFollowUpQuestion(null)
     setIsFollowUpMode(false)
-    if (idx + 1 >= session.questions.length) { setStatus('complete'); return }
-    setIdx((v) => v + 1)
+    if (currentQuestionIndex + 1 >= session.questions.length) { setStatus('complete'); return }
+    setCurrentQuestionIndex((v) => v + 1)
     setTimeLeft(session.timePerQuestionSeconds)
   }
 
@@ -305,7 +307,7 @@ const InterviewSession = () => {
               <span className={'interview-chat-timer' + (timerWarning ? ' interview-chat-timer--warn' : '')}>
                 {clock(timeLeft)}
               </span>
-              <span className="interview-chat-qcount">{idx + 1} / {session.questions.length}</span>
+              <span className="interview-chat-qcount">{currentQuestionIndex + 1} / {session.questions.length}</span>
             </div>
           </header>
 
@@ -315,7 +317,7 @@ const InterviewSession = () => {
               <div className="interview-chat-thread" ref={threadRef}>
 
                 {/* Past Q&A */}
-                {session.questions.slice(0, idx).map((q) => {
+                {session.questions.slice(0, currentQuestionIndex).map((q) => {
                   const past = pastResponse(q.id)
                   return (
                     <div key={q.id} className="interview-chat-block">
@@ -341,8 +343,8 @@ const InterviewSession = () => {
                   <div className="chat-row chat-row--assistant">
                     <div className="chat-avatar">AI</div>
                     <div className="chat-bubble chat-bubble--assistant">
-                      <p className="chat-bubble__text">{question.prompt}</p>
-                      {question.guidance ? (
+                      <p className="chat-bubble__text">{isFollowUpMode ? followUpQuestion : question.prompt}</p>
+                      {!isFollowUpMode && question.guidance ? (
                         <p className="chat-bubble__hint">{question.guidance}</p>
                       ) : null}
                     </div>
@@ -352,7 +354,7 @@ const InterviewSession = () => {
                     <>
                       <div className="chat-row chat-row--user">
                         <div className="chat-bubble chat-bubble--user">
-                          <p className="chat-bubble__text">{draft.trim() || 'No text — voice only.'}</p>
+                          <p className="chat-bubble__text">{answerDraft.trim() || 'No text — voice only.'}</p>
                         </div>
                       </div>
 
@@ -410,8 +412,8 @@ const InterviewSession = () => {
 
                   <textarea
                     className="interview-chat-textarea"
-                    value={draft}
-                    onChange={(e) => setDraft(e.target.value)}
+                    value={answerDraft}
+                    onChange={(e) => setAnswerDraft(e.target.value)}
                     placeholder="Type your answer or use the mic…"
                     rows={4}
                   />
@@ -454,9 +456,8 @@ const InterviewSession = () => {
                           type="button"
                           className="button button--primary"
                           onClick={() => {
-                            setDraft('')
+                            setAnswerDraft('')
                             setSubmitted(false)
-                            setIsFollowUpMode(false)
                           }}
                         >
                           Answer follow-up
@@ -465,7 +466,7 @@ const InterviewSession = () => {
                     </>
                   ) : (
                     <button type="button" className="button button--primary interview-chat-next" onClick={goNext}>
-                      {idx + 1 === session.questions.length ? '🏁 Finish' : 'Next question →'}
+                      {currentQuestionIndex + 1 === session.questions.length ? '🏁 Finish' : 'Next question →'}
                     </button>
                   )}
                 </div>
@@ -476,7 +477,7 @@ const InterviewSession = () => {
             <aside className="interview-chat-sidebar">
               <div className="interview-chat-progress">
                 <div className="interview-chat-progress__label">
-                  Question {idx + 1} of {session.questions.length}
+                  Question {currentQuestionIndex + 1} of {session.questions.length}
                 </div>
                 <div className="interview-chat-progress__bar">
                   <span style={{ width: `${progress}%` }} />
@@ -539,9 +540,9 @@ const InterviewSession = () => {
 
             <h2 className="interview-summary-notion__h2">Per question</h2>
             <div className="notion-stack">
-              {responses.map((r, i) => (
+              {responses.map((r, questionNumber) => (
                 <article key={r.questionId} className="notion-block">
-                  <div className="notion-block__title">Q{i + 1} · Score {r.metrics.overall * 10}/100</div>
+                  <div className="notion-block__title">Q{questionNumber + 1} · Score {r.metrics.overall * 10}/100</div>
                   <p className="notion-block__q">{r.prompt}</p>
                   <p className="notion-block__a">
                     <em>Your answer:</em> {r.answer.trim() || 'No answer recorded.'}
