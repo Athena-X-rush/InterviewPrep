@@ -60,15 +60,8 @@ const Dashboard = () => {
       <Navbar />
       <main className="notion-report">
         <header className="notion-report__header">
-          <div className="notion-report__icon" aria-hidden="true">
-            /
-          </div>
           <div className="notion-report__content">
-            <p className="notion-report__breadcrumb">Workspace · Report</p>
-            <h1 className="notion-report__title">How things look right now</h1>
-            <p className="notion-report__subtitle">
-              Hey {user?.name?.split(' ')[0] || 'there'} — this page is basically a scratchpad for your score. Not fancy analytics.
-            </p>
+            <p className="notion-report__breadcrumb" style={{ fontWeight: 'bold', fontSize: '1.5rem', color: '#1a1a1a' }}>Dashboard</p>
           </div>
         </header>
 
@@ -171,10 +164,6 @@ const Dashboard = () => {
             </div>
           </details>
         </section>
-
-        <footer className="notion-report__footer">
-          <p>Last updated when you opened this page. Refresh to pull again.</p>
-        </footer>
       </main>
     </div>
   );

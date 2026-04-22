@@ -4,7 +4,6 @@ import QuestionCard from '../components/QuestionCard'
 import ProgressBar from '../components/ProgressBar'
 import Timer from '../components/Timer'
 import useQuiz from '../hooks/useQuiz'
-import { buildQuizQuestions } from '../data/questionBank'
 import { AuthContext } from '../context/AuthContext'
 import api from '../services/api'
 
@@ -197,27 +196,44 @@ const Quiz = () => {
     }
 
     setLoadingStep(0)
-    const generatedQuestions = buildQuizQuestions({
-      topic: form.topic || 'dsa',
-      difficulty: form.difficulty,
-      questionCount: form.questionCount
-    })
+    let isMounted = true
+
+    const generateQuestions = async () => {
+      try {
+        const response = await api.post('/ai/generate-quiz-questions', {
+          topic: form.topic || 'Computer Science',
+          difficulty: form.difficulty,
+          questionCount: form.questionCount
+        })
+
+        if (isMounted) {
+          startQuiz(response.data.questions)
+        }
+      } catch (error) {
+        console.error('Error generating questions:', error)
+        if (isMounted) {
+          alert('Failed to generate questions. Please try again.')
+          resetQuiz()
+        }
+      }
+    }
 
     const timers = loadSteps.map((_, index) =>
       window.setTimeout(() => {
-        setLoadingStep(index)
+        if (isMounted) setLoadingStep(index)
       }, index * 700)
     )
 
     const startTimer = window.setTimeout(() => {
-      startQuiz(generatedQuestions)
+      generateQuestions()
     }, loadSteps.length * 700 + 250)
 
     return () => {
+      isMounted = false
       timers.forEach((timer) => window.clearTimeout(timer))
       window.clearTimeout(startTimer)
     }
-  }, [form.difficulty, form.questionCount, form.topic, startQuiz, status])
+  }, [form.difficulty, form.questionCount, form.topic, startQuiz, status, resetQuiz])
 
   useEffect(() => {
     if (status !== 'active') {

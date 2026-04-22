@@ -138,7 +138,7 @@ export const getLeaderboard = async (req, res) => {
 export const getMyPerformance = async (req, res) => {
   try {
     const [activities, personalSummary, leaderboard] = await Promise.all([
-      Score.find({ user: req.user._id }).sort({ createdAt: -1 }).limit(8).lean(),
+      Score.find({ user: req.user._id, sort: true, limit: 8 }),
       Score.aggregate([
         { $match: { user: req.user._id } },
         {

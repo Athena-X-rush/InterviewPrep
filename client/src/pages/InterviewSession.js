@@ -158,10 +158,10 @@ const InterviewSession = () => {
 
   // Speak question
   useEffect(() => {
-    if (!question || !voicesReady) return
+    if (!question || !voicesReady || !camReady) return
     speak(question.prompt, muted)
     return () => window.speechSynthesis.cancel()
-  }, [question, muted, voicesReady])
+  }, [question, muted, voicesReady, camReady])
 
   // Auto-scroll thread
   useEffect(() => {
@@ -247,31 +247,64 @@ const InterviewSession = () => {
     if (!question) return
     window.speechSynthesis.cancel()
     stopRecording()
-    const metrics = scoreAnswer(answerDraft, question.prompt, session.summaryTopic || session.metaLabel)
-    const entry = { questionId: question.id, prompt: question.prompt, answer: answerDraft, metrics }
-    setResponses((prev) => {
-      const i = prev.findIndex((r) => r.questionId === question.id)
-      if (i >= 0) { const next = [...prev]; next[i] = entry; return next }
-      return [...prev, entry]
-    })
-    setFeedback(entry)
-    setSubmitted(true)
-    setHint('')
     
-    // Automatically request follow-up
     setLoadingFollowUp(true)
+    setHint('Evaluating your answer...')
+    
     try {
-      const response = await api.post('/ai/follow-up', {
+      const response = await api.post('/ai/evaluate-answer', {
         question: question.prompt,
         answer: answerDraft,
-        topic: session.summaryTopic || session.modeName,
-        difficulty: session.summaryDifficulty || 'medium'
+        topic: session.summaryTopic || session.modeName
       })
-      setFollowUpQuestion(response.data.followUpQuestion)
-      setIsFollowUpMode(true)
-      setTimeout(() => speak(response.data.followUpQuestion, muted), 500)
+      
+      const metrics = {
+        overall: response.data.overall,
+        relevance: response.data.relevance,
+        depth: response.data.depth,
+        communication: response.data.communication,
+        feedback: response.data.feedback,
+        strengths: response.data.strengths,
+        improvements: response.data.improvements
+      }
+      
+      const entry = { questionId: question.id, prompt: question.prompt, answer: answerDraft, metrics }
+      setResponses((prev) => {
+        const i = prev.findIndex((r) => r.questionId === question.id)
+        if (i >= 0) { const next = [...prev]; next[i] = entry; return next }
+        return [...prev, entry]
+      })
+      setFeedback(entry)
+      setSubmitted(true)
+      setHint('')
+      
+      // Automatically request follow-up
+      try {
+        const followUpResponse = await api.post('/ai/follow-up', {
+          question: question.prompt,
+          answer: answerDraft,
+          topic: session.summaryTopic || session.modeName,
+          difficulty: session.summaryDifficulty || 'medium'
+        })
+        setFollowUpQuestion(followUpResponse.data.followUpQuestion)
+        setIsFollowUpMode(true)
+        setTimeout(() => speak(followUpResponse.data.followUpQuestion, muted), 500)
+      } catch (error) {
+        setHint('Follow-up generation failed. You can move to the next question.')
+      }
     } catch (error) {
-      setHint('Follow-up generation failed. You can move to the next question.')
+      console.error('Evaluation error:', error)
+      setHint('Failed to evaluate answer. Using fallback scoring.')
+      const metrics = scoreAnswer(answerDraft, question.prompt, session.summaryTopic || session.metaLabel)
+      const entry = { questionId: question.id, prompt: question.prompt, answer: answerDraft, metrics }
+      setResponses((prev) => {
+        const i = prev.findIndex((r) => r.questionId === question.id)
+        if (i >= 0) { const next = [...prev]; next[i] = entry; return next }
+        return [...prev, entry]
+      })
+      setFeedback(entry)
+      setSubmitted(true)
+      setHint('')
     } finally {
       setLoadingFollowUp(false)
     }
@@ -422,7 +455,10 @@ const InterviewSession = () => {
                     <button
                       type="button"
                       className="button button--secondary"
-                      onClick={() => setStatus('complete')}
+                      onClick={() => {
+                        window.speechSynthesis.cancel()
+                        setStatus('complete')
+                      }}
                     >
                       End early
                     </button>
@@ -520,7 +556,7 @@ const InterviewSession = () => {
                 <span className="isummary-score-card__label">/ 100</span>
               </div>
               <p className="isummary-score-card__note">
-                Keyword-based estimate — not a human evaluation.
+                AI-powered evaluation
               </p>
             </div>
 
@@ -547,14 +583,27 @@ const InterviewSession = () => {
                   <p className="notion-block__a">
                     <em>Your answer:</em> {r.answer.trim() || 'No answer recorded.'}
                   </p>
-                  <div className="interview-detail-badges">
-                    {r.metrics.matched.length > 0 && (
-                      <span className="topic-badge topic-badge--success">✓ {r.metrics.matched.join(', ')}</span>
-                    )}
-                    {r.metrics.missing.length > 0 && (
-                      <span className="topic-badge topic-badge--warning">Missing: {r.metrics.missing.join(', ')}</span>
-                    )}
-                  </div>
+                  {r.metrics.feedback && (
+                    <p className="notion-block__feedback">
+                      <strong>Feedback:</strong> {r.metrics.feedback}
+                    </p>
+                  )}
+                  {r.metrics.strengths && r.metrics.strengths.length > 0 && (
+                    <div className="notion-block__list">
+                      <strong>Strengths:</strong>
+                      <ul>
+                        {r.metrics.strengths.map((s, i) => <li key={i}>{s}</li>)}
+                      </ul>
+                    </div>
+                  )}
+                  {r.metrics.improvements && r.metrics.improvements.length > 0 && (
+                    <div className="notion-block__list">
+                      <strong>Improvements:</strong>
+                      <ul>
+                        {r.metrics.improvements.map((imp, i) => <li key={i}>{imp}</li>)}
+                      </ul>
+                    </div>
+                  )}
                 </article>
               ))}
             </div>
