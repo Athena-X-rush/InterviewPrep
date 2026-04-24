@@ -2,24 +2,39 @@ import Groq from 'groq-sdk';
 
 export const generateResumeQuestions = async (req, res) => {
   try {
-    const { resumeText, role, difficulty, questionCount } = req.body;
+    const { resumeText, role, difficulty, questionCount, personality, company } = req.body;
 
     if (!resumeText || !role) {
       return res.status(400).json({ message: 'Resume text and role are required' });
     }
 
-    const groqClient = new Groq({
-      apiKey: process.env.GROQ_API_KEY,
-    });
+    const groqClient = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
-    const systemPrompt = `You are a technical interviewer conducting a ${difficulty || 'medium'} difficulty interview for a ${role} position.
+    const personalityPrompts = {
+      strict: `You are a tough, demanding technical interviewer. Challenge every answer. Ask follow-up questions that test depth. Be critical and push for better explanations. Do not accept superficial answers.`,
+      friendly: `You are a supportive mentor interviewer. Encourage the candidate. Give helpful hints. Be patient and constructive in your feedback. Make the candidate feel comfortable.`,
+      faang: `You are a FAANG-style interviewer. Ask complex, multi-layered questions. Focus on problem-solving approach, not just answers. Expect clear communication and structured thinking.`
+    };
+
+    const companyPrompts = {
+      google: `Focus on problem-solving, scalability, and system design. Ask questions that test ability to think through complex problems.`,
+      amazon: `Ask questions that test leadership principles like "Customer Obsession", "Ownership", "Bias for Action", and "Deliver Results".`,
+      meta: `Focus on impact at scale, fast iteration, and building for billions of users. Test ability to handle ambiguity.`,
+      startup: `Focus on practical skills, speed of execution, and adaptability. Ask about wearing multiple hats and shipping products.`
+    };
+
+    const base = `You are a technical interviewer conducting a ${difficulty || 'medium'} difficulty interview for a ${role} position.`;
+    const personalityPrompt = personalityPrompts[personality] || '';
+    const companyStyle = companyPrompts[company] || '';
+
+    const systemPrompt = `${base} ${personalityPrompt} ${companyStyle}
 
 Based on the candidate's resume content below, generate ${questionCount || 8} UNIQUE interview questions. CRITICAL: Each question must be completely different from the others. No duplicates, no similar questions, no variations of the same concept.
 
 Each question should:
 1. Be specific to the skills, projects, and experience mentioned in the resume
 2. Match the difficulty level (${difficulty || 'medium'})
-3. Cover DIFFERENT aspects of the resume (e.g., different projects, different skills, different experiences, behavioral vs technical, etc.)
+3. Cover DIFFERENT aspects of the resume
 4. Use different question formats (project deep-dive, technical skills, behavioral, scenario-based, "tell me about a time", etc.)
 5. Be concise and clear
 6. Test understanding of their actual experience
@@ -27,7 +42,7 @@ Each question should:
 Resume content:
 ${resumeText}
 
-Return ONLY a JSON array of strings, each string being a question. No additional text or commentary. Ensure ALL questions are unique and cover different aspects of the resume.`;
+Return ONLY a JSON array of strings, each string being a question. No additional text or commentary.`;
 
     const userPrompt = `Role: ${role}\nDifficulty: ${difficulty || 'medium'}\nNumber of questions: ${questionCount || 8}\n\nGenerate ${questionCount || 8} unique interview questions based on the resume.`;
 
@@ -38,36 +53,33 @@ Return ONLY a JSON array of strings, each string being a question. No additional
         { role: 'user', content: userPrompt },
       ],
       max_tokens: 1500,
-      temperature: 0.8,
+      temperature: 0.9,
     });
 
-    const responseText = aiResponse.choices[0]?.message?.content?.trim() || '[]';
+    const raw = aiResponse.choices[0]?.message?.content?.trim() || '[]';
+
     let questions;
-    
     try {
-      questions = JSON.parse(responseText);
-      if (!Array.isArray(questions)) {
-        questions = [responseText];
-      }
+      questions = JSON.parse(raw);
+      if (!Array.isArray(questions)) questions = [raw];
     } catch {
-      questions = [responseText];
+      questions = [raw];
     }
 
-    const formattedQuestions = questions.map((q, index) => ({
-      id: `resume-question-${index + 1}`,
+    const result = questions.map((q, i) => ({
+      id: `resume-question-${i + 1}`,
       prompt: q,
       guidance: 'Use a structured answer with context, your decision-making, and a concrete outcome.',
     }));
 
-    res.json({ questions: formattedQuestions });
-  } catch (error) {
-    console.error('Groq API error:', error);
-    res.status(500).json({ 
-      message: 'Failed to generate questions',
-      error: error.message 
-    });
+    res.json({ questions: result });
+
+  } catch (err) {
+    console.error('Groq API error:', err);
+    res.status(500).json({ message: 'Failed to generate questions', error: err.message });
   }
 };
+
 
 export const generateQuestions = async (req, res) => {
   try {
@@ -77,23 +89,20 @@ export const generateQuestions = async (req, res) => {
       return res.status(400).json({ message: 'Topic is required' });
     }
 
-    const groqClient = new Groq({
-      apiKey: process.env.GROQ_API_KEY,
-    });
+    const groqClient = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
-    const systemPrompt = `You are a technical interviewer conducting a ${difficulty || 'medium'} difficulty interview on ${topic || 'computer science'}.
+    const systemPrompt = `You are a technical interviewer conducting a ${difficulty || 'medium'} difficulty interview on ${topic}.
 
-Generate ${questionCount || 6} UNIQUE interview questions on this topic. CRITICAL: Each question must be completely different from the others. No duplicates, no similar questions, no variations of the same concept.
+Generate ${questionCount || 6} UNIQUE interview questions on this topic. Each question must be completely different from the others. No duplicates, no similar questions.
 
 Each question should:
 1. Be specific to the topic
 2. Match the difficulty level (${difficulty || 'medium'})
-3. Cover DIFFERENT aspects of the topic (e.g., different subtopics, different concepts, different scenarios, etc.)
+3. Cover DIFFERENT aspects of the topic
 4. Use different question formats (conceptual, practical, scenario-based, comparison, "what happens if", etc.)
 5. Be concise and clear
-6. Test different aspects of the topic
 
-Return ONLY a JSON array of strings, each string being a question. No additional text or commentary. Ensure ALL questions are unique and cover different subtopics.`;
+Return ONLY a JSON array of strings. No additional text or commentary.`;
 
     const userPrompt = `Topic: ${topic}\nDifficulty: ${difficulty || 'medium'}\nNumber of questions: ${questionCount || 6}\n\nGenerate ${questionCount || 6} unique interview questions.`;
 
@@ -104,112 +113,152 @@ Return ONLY a JSON array of strings, each string being a question. No additional
         { role: 'user', content: userPrompt },
       ],
       max_tokens: 1000,
-      temperature: 0.8,
+      temperature: 0.9,
     });
 
-    const responseText = aiResponse.choices[0]?.message?.content?.trim() || '[]';
+    const raw = aiResponse.choices[0]?.message?.content?.trim() || '[]';
+
     let questions;
-    
     try {
-      questions = JSON.parse(responseText);
-      if (!Array.isArray(questions)) {
-        questions = [responseText];
-      }
+      questions = JSON.parse(raw);
+      if (!Array.isArray(questions)) questions = [raw];
     } catch {
-      questions = [responseText];
+      questions = [raw];
     }
 
-    const formattedQuestions = questions.map((q, index) => ({
-      id: `ai-question-${index + 1}`,
+    const result = questions.map((q, i) => ({
+      id: `ai-question-${i + 1}`,
       prompt: q,
       guidance: 'Use a structured answer with context, your decision-making, and a concrete outcome.',
     }));
 
-    res.json({ questions: formattedQuestions });
-  } catch (error) {
-    console.error('Groq API error:', error);
-    res.status(500).json({ 
-      message: 'Failed to generate questions',
-      error: error.message 
-    });
+    res.json({ questions: result });
+
+  } catch (err) {
+    console.error('Groq API error:', err);
+    res.status(500).json({ message: 'Failed to generate questions', error: err.message });
   }
 };
+
 
 export const askFollowUp = async (req, res) => {
   try {
-    const { question, answer, topic, difficulty } = req.body;
+    const { history, topic, difficulty } = req.body;
 
-    if (!question || !answer) {
-      return res.status(400).json({ message: 'Question and answer are required' });
+    if (!history || !Array.isArray(history) || history.length === 0) {
+      return res.status(400).json({ message: 'Conversation history is required' });
     }
 
-    const groqClient = new Groq({
-      apiKey: process.env.GROQ_API_KEY,
-    });
+    const groqClient = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
-    const systemPrompt = `You are a technical interviewer conducting a ${difficulty || 'medium'} difficulty interview on ${topic || 'computer science'}.
-    
-Generate a relevant follow-up question based on the candidate's answer. The follow-up should:
-1. Probe deeper into specific points mentioned in their answer
-2. Test understanding of related concepts
-3. Be concise (1-2 sentences)
-4. Be technically accurate
-5. Match the difficulty level
+    const lastAnswer = history[history.length - 1].answer;
+    const lastQuestion = history[history.length - 1].question;
 
-Return ONLY the follow-up question as plain text, no additional commentary.`;
-
-    const userPrompt = `Original question: ${question}\n\nCandidate's answer: ${answer}\n\nGenerate a relevant follow-up question.`;
-
-    const aiResponse = await groqClient.chat.completions.create({
+    const step1 = await groqClient.chat.completions.create({
       model: 'llama-3.3-70b-versatile',
       messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt },
+        {
+          role: 'system',
+          content: `Extract exactly 3 specific technical concepts, technologies, or claims the candidate mentioned in their answer.
+Return ONLY a JSON array of 3 strings. No explanation, no markdown, no extra text.
+Example output: ["Redis cache eviction policy", "fan-out on write", "vector clocks"]`
+        },
+        {
+          role: 'user',
+          content: `Candidate's answer: "${lastAnswer}"\n\nExtract 3 specific technical concepts from this answer.`
+        }
       ],
-      max_tokens: 150,
-      temperature: 0.7,
+      max_tokens: 100,
+      temperature: 0.3,
     });
 
-    const followUpQuestion = aiResponse.choices[0]?.message?.content?.trim() || null;
+    let concepts = [];
+    try {
+      const text = step1.choices[0]?.message?.content?.trim() || '[]';
+      const cleaned = text.replace(/```json/g, '').replace(/```/g, '').trim();
+      concepts = JSON.parse(cleaned);
+      if (!Array.isArray(concepts) || concepts.length === 0) throw new Error('empty');
+    } catch {
+      concepts = [lastAnswer.slice(0, 100)];
+    }
+
+    const picked = concepts[0];
+
+    const step2 = await groqClient.chat.completions.create({
+      model: 'llama-3.3-70b-versatile',
+      messages: [
+        {
+          role: 'system',
+          content: `You are a strict technical interviewer. Ask ONE deep follow-up question on the concept given.
+Rules:
+- Go deeper technically on that exact concept
+- Be very specific, not general
+- 1 sentence only
+- Do not introduce new topics
+- Return ONLY the question, nothing else`
+        },
+        {
+          role: 'user',
+          content: `The candidate was asked: "${lastQuestion}"\n\nThey mentioned: "${picked}"\n\nAsk one deep technical follow-up question specifically about this.`
+        }
+      ],
+      max_tokens: 100,
+      temperature: 0.5,
+    });
+
+    const followUpQuestion = step2.choices[0]?.message?.content?.trim() || null;
 
     res.json({ followUpQuestion });
-  } catch (error) {
-    console.error('Groq API error:', error);
-    res.status(500).json({ 
-      message: 'Failed to generate follow-up question',
-      error: error.message 
-    });
+
+  } catch (err) {
+    console.error('Groq API error:', err);
+    res.status(500).json({ message: 'Failed to generate follow-up question', error: err.message });
   }
 };
 
+
 export const generateDocumentQuestions = async (req, res) => {
   try {
-    const { documentText, role, difficulty, questionCount } = req.body;
+    const { documentText, role, difficulty, questionCount, personality, company } = req.body;
 
     if (!documentText || !role) {
       return res.status(400).json({ message: 'Document text and role are required' });
     }
 
-    const groqClient = new Groq({
-      apiKey: process.env.GROQ_API_KEY,
-    });
+    const groqClient = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
-    const systemPrompt = `You are a technical interviewer conducting a ${difficulty || 'medium'} difficulty interview for a ${role} position.
+    const personalityPrompts = {
+      strict: `You are a tough, demanding technical interviewer. Challenge every answer. Ask follow-up questions that test depth. Be critical and push for better explanations. Do not accept superficial answers.`,
+      friendly: `You are a supportive mentor interviewer. Encourage the candidate. Give helpful hints. Be patient and constructive in your feedback. Make the candidate feel comfortable.`,
+      faang: `You are a FAANG-style interviewer. Ask complex, multi-layered questions. Focus on problem-solving approach, not just answers. Expect clear communication and structured thinking.`
+    };
 
-Based on the study document content below, generate ${questionCount || 8} UNIQUE interview questions. CRITICAL: Each question must be completely different from the others. No duplicates, no similar questions, no variations of the same concept.
+    const companyPrompts = {
+      google: `Focus on problem-solving, scalability, and system design. Ask questions that test ability to think through complex problems.`,
+      amazon: `Ask questions that test leadership principles like "Customer Obsession", "Ownership", "Bias for Action", and "Deliver Results".`,
+      meta: `Focus on impact at scale, fast iteration, and building for billions of users. Test ability to handle ambiguity.`,
+      startup: `Focus on practical skills, speed of execution, and adaptability. Ask about wearing multiple hats and shipping products.`
+    };
+
+    const base = `You are a technical interviewer conducting a ${difficulty || 'medium'} difficulty interview for a ${role} position.`;
+    const personalityStyle = personalityPrompts[personality] || '';
+    const companyStyle = companyPrompts[company] || '';
+
+    const systemPrompt = `${base} ${personalityStyle} ${companyStyle}
+
+Based on the study document content below, generate ${questionCount || 8} UNIQUE interview questions. Each question must be completely different from the others. No duplicates, no similar questions.
 
 Each question should:
-1. Be specific to the concepts, topics, and information in the document
+1. Be specific to the concepts and topics in the document
 2. Match the difficulty level (${difficulty || 'medium'})
-3. Cover DIFFERENT aspects of the document (e.g., different sections, different concepts, different topics, different applications, etc.)
-4. Use different question formats (conceptual, practical, scenario-based, comparison, "what happens if", etc.)
+3. Cover DIFFERENT aspects of the document
+4. Use different question formats (conceptual, practical, scenario-based, comparison, etc.)
 5. Be concise and clear
-6. Test understanding of the document content
 
 Document content:
 ${documentText}
 
-Return ONLY a JSON array of strings, each string being a question. No additional text or commentary. Ensure ALL questions are unique and cover different aspects of the document.`;
+Return ONLY a JSON array of strings. No additional text or commentary.`;
 
     const userPrompt = `Role: ${role}\nDifficulty: ${difficulty || 'medium'}\nNumber of questions: ${questionCount || 8}\n\nGenerate ${questionCount || 8} unique interview questions based on the document.`;
 
@@ -220,35 +269,32 @@ Return ONLY a JSON array of strings, each string being a question. No additional
         { role: 'user', content: userPrompt },
       ],
       max_tokens: 1500,
-      temperature: 0.8,
+      temperature: 0.9,
     });
 
-    const responseText = aiResponse.choices[0]?.message?.content?.trim() || '[]';
+    const raw = aiResponse.choices[0]?.message?.content?.trim() || '[]';
+
     let questions;
-    
     try {
-      questions = JSON.parse(responseText);
-      if (!Array.isArray(questions)) {
-        questions = [responseText];
-      }
+      questions = JSON.parse(raw);
+      if (!Array.isArray(questions)) questions = [];
     } catch {
-      questions = [responseText];
+      questions = [];
     }
 
-    const formattedQuestions = questions.map((q, index) => ({
-      id: `document-question-${index + 1}`,
+    const result = questions.map((q, i) => ({
+      id: `document-question-${i + 1}`,
       prompt: q,
     }));
 
-    res.json({ questions: formattedQuestions });
-  } catch (error) {
-    console.error('Groq API error:', error);
-    res.status(500).json({ 
-      message: 'Failed to generate questions',
-      error: error.message 
-    });
+    res.json({ questions: result });
+
+  } catch (err) {
+    console.error('Groq API error:', err);
+    res.status(500).json({ message: 'Failed to generate questions', error: err.message });
   }
 };
+
 
 export const evaluateAnswer = async (req, res) => {
   try {
@@ -258,30 +304,20 @@ export const evaluateAnswer = async (req, res) => {
       return res.status(400).json({ message: 'Question and answer are required' });
     }
 
-    const groqClient = new Groq({
-      apiKey: process.env.GROQ_API_KEY,
-    });
+    const groqClient = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
     const systemPrompt = `You are a technical interviewer evaluating a candidate's answer.
-
-Evaluate the answer based on:
-1. Relevance to the question
-2. Depth of understanding
-3. Communication clarity
-4. Technical accuracy
 
 Provide a JSON response with this exact structure:
 {
   "overall": number (1-10),
-  "relevance": number (1-10),
-  "depth": number (1-10),
-  "communication": number (1-10),
   "feedback": string (brief constructive feedback),
-  "strengths": array of strings (what the candidate did well),
-  "improvements": array of strings (what could be improved)
+  "strengths": array of strings,
+  "improvements": array of strings,
+  "betterAnswer": string (a better version of the answer)
 }
 
-Return ONLY the JSON, no additional text.`;
+Return ONLY the JSON. No markdown, no backticks, no extra text.`;
 
     const userPrompt = `Question: ${question}\n\nCandidate's answer: ${answer}\n\nTopic: ${topic || 'general'}\n\nEvaluate this answer.`;
 
@@ -295,17 +331,15 @@ Return ONLY the JSON, no additional text.`;
       temperature: 0.7,
     });
 
-    const responseText = aiResponse.choices[0]?.message?.content?.trim() || '{}';
+    const raw = aiResponse.choices[0]?.message?.content?.trim() || '{}';
+
     let evaluation;
-    
     try {
-      evaluation = JSON.parse(responseText);
+      const cleaned = raw.replace(/```json/g, '').replace(/```/g, '').trim();
+      evaluation = JSON.parse(cleaned);
     } catch {
       evaluation = {
         overall: 5,
-        relevance: 5,
-        depth: 5,
-        communication: 5,
         feedback: 'Could not parse AI evaluation.',
         strengths: [],
         improvements: []
@@ -313,14 +347,13 @@ Return ONLY the JSON, no additional text.`;
     }
 
     res.json(evaluation);
-  } catch (error) {
-    console.error('Groq API error:', error);
-    res.status(500).json({ 
-      message: 'Failed to evaluate answer',
-      error: error.message 
-    });
+
+  } catch (err) {
+    console.error('Groq API error:', err);
+    res.status(500).json({ message: 'Failed to evaluate answer', error: err.message });
   }
 };
+
 
 export const generateQuizQuestions = async (req, res) => {
   try {
@@ -330,28 +363,19 @@ export const generateQuizQuestions = async (req, res) => {
       return res.status(400).json({ message: 'Topic is required' });
     }
 
-    const groqClient = new Groq({
-      apiKey: process.env.GROQ_API_KEY,
-    });
+    const groqClient = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
-    const systemPrompt = `You are a quiz creator generating multiple-choice questions for a ${difficulty || 'medium'} difficulty quiz on ${topic || 'computer science'}.
+    const systemPrompt = `You are a quiz creator generating multiple-choice questions for a ${difficulty || 'medium'} difficulty quiz on ${topic}.
 
-Generate ${questionCount || 5} UNIQUE multiple-choice questions. CRITICAL: Each question must be completely different from the others. No duplicates, no similar questions, no variations of the same concept.
-
-Each question should:
-1. Be specific to the topic
-2. Match the difficulty level (${difficulty || 'medium'})
-3. Cover DIFFERENT aspects of the topic (e.g., if topic is OS, cover process management, memory management, file systems, I/O, etc.)
-4. Be concise and clear
-5. Use different question formats (definition, comparison, scenario, "what happens if", etc.)
+Generate ${questionCount || 5} UNIQUE multiple-choice questions. Each question must be completely different. No duplicates.
 
 Each question must have:
 - A clear question text
-- 4 options (A, B, C, D) - all plausible but only one correct
+- 4 options (A, B, C, D) — all plausible but only one correct
 - The correct option letter
 - A brief explanation of why the answer is correct
 
-Return ONLY a JSON array with this exact structure:
+Return ONLY a JSON array with this exact structure, no markdown, no backticks:
 [
   {
     "question": "string",
@@ -359,9 +383,7 @@ Return ONLY a JSON array with this exact structure:
     "correctAnswer": "A",
     "explanation": "string"
   }
-]
-
-No additional text or commentary. Ensure ALL questions are unique and cover different subtopics.`;
+]`;
 
     const userPrompt = `Topic: ${topic}\nDifficulty: ${difficulty || 'medium'}\nNumber of questions: ${questionCount || 5}\n\nGenerate ${questionCount || 5} unique multiple-choice questions.`;
 
@@ -372,35 +394,32 @@ No additional text or commentary. Ensure ALL questions are unique and cover diff
         { role: 'user', content: userPrompt },
       ],
       max_tokens: 2000,
-      temperature: 0.8,
+      temperature: 0.9,
     });
 
-    const responseText = aiResponse.choices[0]?.message?.content?.trim() || '[]';
+    const raw = aiResponse.choices[0]?.message?.content?.trim() || '[]';
+
     let questions;
-    
     try {
-      questions = JSON.parse(responseText);
-      if (!Array.isArray(questions)) {
-        questions = [];
-      }
+      const cleaned = raw.replace(/```json/g, '').replace(/```/g, '').trim();
+      questions = JSON.parse(cleaned);
+      if (!Array.isArray(questions)) questions = [];
     } catch {
       questions = [];
     }
 
-    const formattedQuestions = questions.map((q, index) => ({
-      id: `quiz-question-${index + 1}`,
+    const result = questions.map((q, i) => ({
+      id: `quiz-question-${i + 1}`,
       prompt: q.question,
       options: q.options,
       correctAnswer: q.correctAnswer,
-      explanation: q.explanation
+      explanation: q.explanation,
     }));
 
-    res.json({ questions: formattedQuestions });
-  } catch (error) {
-    console.error('Groq API error:', error);
-    res.status(500).json({ 
-      message: 'Failed to generate questions',
-      error: error.message 
-    });
+    res.json({ questions: result });
+
+  } catch (err) {
+    console.error('Groq API error:', err);
+    res.status(500).json({ message: 'Failed to generate questions', error: err.message });
   }
 };

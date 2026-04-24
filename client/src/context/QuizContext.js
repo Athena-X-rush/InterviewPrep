@@ -92,6 +92,10 @@ export const QuizProvider = ({ children }) => {
     return true;
   };
 
+  const endEarly = () => {
+    setStatus('results');
+  };
+
   const value = useMemo(
     () => ({
       status,
@@ -111,6 +115,7 @@ export const QuizProvider = ({ children }) => {
       chooseOption,
       submitAnswer,
       resetQuiz,
+      endEarly,
     }),
     [
       answers,

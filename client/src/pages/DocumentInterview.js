@@ -3,19 +3,31 @@ import { Link, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import api from '../services/api';
 
+const roles = ['Software Engineer', 'Frontend Engineer', 'Backend Engineer', 'Data Analyst', 'Full Stack Engineer']
+const difficulties = ['Easy (Junior)', 'Hard (Senior Level)']
+const questionOptions = ['5 Questions', '8 Questions', '10 Questions']
+const timeOptions = ['1 minute', '2 minutes', '3 minutes']
+const personalities = ['Standard', 'Strict', 'Friendly', 'FAANG']
+const companies = ['None', 'Google', 'Amazon', 'Meta', 'Startup']
+
 const DocumentInterview = () => {
   const { user } = useContext(AuthContext);
   const navigate = useNavigate();
   const [form, setForm] = useState({
-    userName: user?.name || 'Learner',
     role: 'Software Engineer',
-    difficulty: 'Medium',
+    difficulty: 'Easy (Junior)',
     questions: '8 Questions',
     timePerQuestion: '2 minutes',
+    personality: 'Standard',
+    company: 'None',
   });
   const [documentText, setDocumentText] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  const userName = user?.name || 'Learner'
+  const questionCount = Number(form.questions.split(' ')[0])
+  const timePerQuestionSeconds = Number(form.timePerQuestion.split(' ')[0]) * 60
 
   const set = (key, val) => setForm((f) => ({ ...f, [key]: val }));
 
@@ -33,11 +45,12 @@ const DocumentInterview = () => {
         documentText,
         role: form.role,
         difficulty: form.difficulty,
-        questionCount: Number(form.questions.split(' ')[0]),
+        questionCount,
+        personality: form.personality.toLowerCase(),
+        company: form.company.toLowerCase(),
       });
 
       const questions = response.data.questions;
-      const timePerQuestionSeconds = Number(form.timePerQuestion.split(' ')[0]) * 60;
 
       navigate('/interview/session', {
         state: {
@@ -45,8 +58,8 @@ const DocumentInterview = () => {
           modeLabel: 'DOCUMENT',
           metaLabel: `${form.role.toUpperCase()} · ${form.difficulty.toUpperCase()}`,
           summaryTopic: form.role,
-          summaryDifficulty: form.difficulty.toLowerCase(),
-          userName: form.userName.trim() || 'Guest',
+          summaryDifficulty: form.difficulty,
+          userName: userName.trim() || 'Guest',
           timePerQuestionSeconds,
           questions,
         },
@@ -64,76 +77,86 @@ const DocumentInterview = () => {
       <main className="interview-page interview-page--wide">
         <Link to="/interview" className="back-link">← Back</Link>
 
-        <section className="interview-title-block">
-          <h1>Document interview</h1>
-        </section>
+        <div className="iresume-header">
+          <h1>📄 Document Interview</h1>
+        </div>
 
-        <section className="two-panel-layout">
-          <article className="interview-panel">
-            <h2>Interview Setup</h2>
+        <div className="iresume-layout">
+          {/* Setup panel */}
+          <section className="iresume-panel">
+            <h2>Session setup</h2>
 
-            <label className="form-group">
-              <span>Active User</span>
-              <input
-                type="text"
-                value={form.userName}
-                readOnly
-              />
-            </label>
-
-            <label className="form-group">
-              <span>Target Role</span>
-              <select
-                value={form.role}
-                onChange={(e) => set('role', e.target.value)}
-              >
-                <option>Software Engineer</option>
-                <option>Frontend Engineer</option>
-                <option>Backend Engineer</option>
-                <option>Product Manager</option>
-              </select>
-            </label>
-
-            <div className="interview-inline-grid">
-              <label className="form-group">
-                <span>Difficulty</span>
-                <select
-                  value={form.difficulty}
-                  onChange={(e) => set('difficulty', e.target.value)}
-                >
-                  <option>Easy</option>
-                  <option>Medium</option>
-                  <option>Hard</option>
-                </select>
-              </label>
-
-              <label className="form-group">
-                <span>Questions</span>
-                <select
-                  value={form.questions}
-                  onChange={(e) => set('questions', e.target.value)}
-                >
-                  <option>5 Questions</option>
-                  <option>8 Questions</option>
-                  <option>10 Questions</option>
-                </select>
-              </label>
+            <div className="iresume-user-row">
+              <div className="iresume-user-avatar">{userName[0]?.toUpperCase()}</div>
+              <div>
+                <strong>{userName}</strong>
+                <small>Active candidate</small>
+              </div>
             </div>
 
             <label className="form-group">
-              <span>Time Per Question</span>
-              <select
-                value={form.timePerQuestion}
-                onChange={(e) => set('timePerQuestion', e.target.value)}
-              >
-                <option>1 minute</option>
-                <option>2 minutes</option>
-                <option>3 minutes</option>
+              <span>Target role</span>
+              <select value={form.role} onChange={(e) => set('role', e.target.value)}>
+                {roles.map((r) => <option key={r}>{r}</option>)}
               </select>
             </label>
-          </article>
 
-          <article className="interview-panel">
+            <label className="form-group">
+              <span>Difficulty</span>
+              <div className="difficulty-cards">
+                {difficulties.map((d) => (
+                  <div
+                    key={d}
+                    className={`difficulty-card ${form.difficulty === d ? 'difficulty-card--active' : ''}`}
+                    onClick={() => set('difficulty', d)}
+                  >
+                    {d}
+                  </div>
+                ))}
+              </div>
+            </label>
+
+            <label className="form-group">
+              <span>Interviewer style</span>
+              <div className="style-cards">
+                {personalities.map((p) => (
+                  <div
+                    key={p}
+                    className={`style-card ${form.personality === p ? 'style-card--active' : ''}`}
+                    onClick={() => set('personality', p)}
+                  >
+                    {p}
+                  </div>
+                ))}
+              </div>
+            </label>
+
+            <label className="form-group">
+              <span>Company style</span>
+              <select value={form.company} onChange={(e) => set('company', e.target.value)}>
+                {companies.map((c) => <option key={c}>{c}</option>)}
+              </select>
+            </label>
+
+            <div className="ihub-row">
+              <label className="form-group">
+                <span>Questions</span>
+                <select value={form.questions} onChange={(e) => set('questions', e.target.value)}>
+                  {questionOptions.map((q) => <option key={q}>{q}</option>)}
+                </select>
+              </label>
+
+              <label className="form-group">
+                <span>Time / Q</span>
+                <select value={form.timePerQuestion} onChange={(e) => set('timePerQuestion', e.target.value)}>
+                  {timeOptions.map((t) => <option key={t}>{t}</option>)}
+                </select>
+              </label>
+            </div>
+          </section>
+
+          {/* Upload panel */}
+          <section className="iresume-panel">
             <h2>Paste your document</h2>
 
             <textarea
@@ -144,14 +167,20 @@ const DocumentInterview = () => {
               rows={15}
               style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #ddd', fontFamily: 'monospace' }}
             />
-          </article>
-        </section>
+            <div className="iresume-wordcount">{documentText.trim().split(/\s+/).filter(w => w).length} words</div>
 
-        {error ? <p className="inline-error inline-error--wide">{error}</p> : null}
+            {error ? <p className="inline-error">{error}</p> : null}
 
-        <button type="button" className="button button--primary full-width-cta" onClick={handleStart} disabled={loading}>
-          {loading ? 'Generating questions...' : 'Start from document'}
-        </button>
+            <button
+              type="button"
+              className="button button--primary full-width-cta"
+              onClick={handleStart}
+              disabled={loading}
+            >
+              {loading ? 'Generating questions...' : 'Start Interview'}
+            </button>
+          </section>
+        </div>
       </main>
     </div>
   );

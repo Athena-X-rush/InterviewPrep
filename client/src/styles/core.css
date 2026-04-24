@@ -362,6 +362,20 @@ ul { list-style: none; }
   box-shadow: var(--shadow-sm);
 }
 
+.button--destructive {
+  background: #fff;
+  border-color: #dc2626;
+  color: #dc2626;
+  box-shadow: none;
+}
+
+.button--destructive:hover {
+  background: #fef2f2;
+  border-color: #dc2626;
+  color: #dc2626;
+  box-shadow: var(--shadow-sm);
+}
+
 .button:disabled,
 .button--secondary:disabled {
   opacity: 0.5;

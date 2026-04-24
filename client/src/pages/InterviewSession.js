@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, Navigate, useLocation } from 'react-router-dom'
 import api from '../services/api'
 
-const recognitionApi = window.SpeechRecognition || window.webkitSpeechRecognition
+const speechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
 
 const stopWords = new Set([
   'about', 'after', 'again', 'also', 'and', 'answer', 'based', 'been',
@@ -34,35 +34,32 @@ const scoreAnswer = (answer, prompt, topic) => {
   return { overall, relevance, depth, communication, semantic, topicCoverage, matched, missing }
 }
 
-// Pick the best available TTS voice — prefer a natural-sounding English one
 const pickVoice = () => {
   const voices = window.speechSynthesis.getVoices()
-  const preferred = [
-    'Google UK English Female',
-    'Google US English',
-    'Microsoft Aria Online (Natural)',
+  const femaleNames = [
     'Microsoft Jenny Online (Natural)',
-    'Samantha',
-    'Karen',
-    'Moira',
+    'Microsoft Aria Online (Natural)',
+    'Google UK English Female',
+    'Samantha', 'Karen', 'Moira', 'Tessa', 'Victoria', 'Google US English',
   ]
-  for (const name of preferred) {
+  for (const name of femaleNames) {
     const match = voices.find((v) => v.name === name)
     if (match) return match
   }
+  const byLocale = voices.find((v) => v.lang === 'en-GB' && v.name.toLowerCase().includes('female'))
+  if (byLocale) return byLocale
   return voices.find((v) => v.lang.startsWith('en')) || voices[0] || null
 }
 
 const speak = (text, muted) => {
   if (muted || !text) return
   window.speechSynthesis.cancel()
-  const speechUtterance = new SpeechSynthesisUtterance(text)
-  speechUtterance.rate = 0.92
-  speechUtterance.pitch = 1.0
+  const utterance = new SpeechSynthesisUtterance(text)
+  utterance.rate = 0.92
+  utterance.pitch = 1.0
   const voice = pickVoice()
-  if (voice) speechUtterance.voice = voice
-  // Small delay lets voices load on first call
-  setTimeout(() => window.speechSynthesis.speak(speechUtterance), 120)
+  if (voice) utterance.voice = voice
+  setTimeout(() => window.speechSynthesis.speak(utterance), 120)
 }
 
 const ScorePill = ({ label, value }) => {
@@ -79,7 +76,8 @@ const clock = (sec) => `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '
 
 const InterviewSession = () => {
   const location = useLocation()
-  const session = location.state
+  const [session, setSession] = useState(location.state)
+
   const videoRef = useRef(null)
   const speechRef = useRef(null)
   const threadRef = useRef(null)
@@ -90,7 +88,7 @@ const InterviewSession = () => {
   const [responses, setResponses] = useState([])
   const [status, setStatus] = useState('active')
   const [camReady, setCamReady] = useState(false)
-  const [micSupported] = useState(Boolean(recognitionApi))
+  const [micSupported] = useState(Boolean(speechRecognition))
   const [recording, setRecording] = useState(false)
   const [muted, setMuted] = useState(false)
   const [hint, setHint] = useState('')
@@ -98,15 +96,12 @@ const InterviewSession = () => {
   const [submitted, setSubmitted] = useState(false)
   const [saved, setSaved] = useState(false)
   const [voicesReady, setVoicesReady] = useState(false)
-  const [followUpQuestion, setFollowUpQuestion] = useState(null)
   const [loadingFollowUp, setLoadingFollowUp] = useState(false)
-  const [isFollowUpMode, setIsFollowUpMode] = useState(false)
 
   const question = session?.questions?.[currentQuestionIndex] || null
   const progress = session?.questions?.length ? ((currentQuestionIndex + 1) / session.questions.length) * 100 : 0
   const pastResponse = (qid) => responses.find((r) => r.questionId === qid)
 
-  // Load voices
   useEffect(() => {
     const load = () => setVoicesReady(true)
     if (window.speechSynthesis.getVoices().length) {
@@ -117,7 +112,6 @@ const InterviewSession = () => {
     }
   }, [])
 
-  // Camera
   useEffect(() => {
     if (!session || status !== 'active' || !navigator.mediaDevices?.getUserMedia) return
     let stream
@@ -131,24 +125,22 @@ const InterviewSession = () => {
     return () => stream?.getTracks().forEach((t) => t.stop())
   }, [session, status])
 
-  // Speech recognition setup
   useEffect(() => {
-    if (!recognitionApi) return
-    const speechRecognizer = new recognitionApi()
-    speechRecognizer.lang = 'en-US'
-    speechRecognizer.continuous = true
-    speechRecognizer.interimResults = true
-    speechRecognizer.onresult = (e) => {
+    if (!speechRecognition) return
+    const recognizer = new speechRecognition()
+    recognizer.lang = 'en-US'
+    recognizer.continuous = true
+    recognizer.interimResults = true
+    recognizer.onresult = (e) => {
       const text = Array.from(e.results).map((r) => r[0]?.transcript || '').join(' ').trim()
       setAnswerDraft(text)
     }
-    speechRecognizer.onend = () => setRecording(false)
-    speechRecognizer.onerror = () => { setRecording(false); setHint('Voice not available in this browser.') }
-    speechRef.current = speechRecognizer
-    return () => speechRecognizer.stop()
+    recognizer.onend = () => setRecording(false)
+    recognizer.onerror = () => { setRecording(false); setHint('Voice not available in this browser.') }
+    speechRef.current = recognizer
+    return () => recognizer.stop()
   }, [])
 
-  // Timer
   useEffect(() => {
     if (status !== 'active' || submitted) return
     if (timeLeft <= 0) { handleSubmit(); return }
@@ -156,14 +148,12 @@ const InterviewSession = () => {
     return () => clearTimeout(t)
   }, [submitted, status, timeLeft])
 
-  // Speak question
   useEffect(() => {
     if (!question || !voicesReady || !camReady) return
     speak(question.prompt, muted)
     return () => window.speechSynthesis.cancel()
   }, [question, muted, voicesReady, camReady])
 
-  // Auto-scroll thread
   useEffect(() => {
     const el = threadRef.current
     if (el) el.scrollTop = el.scrollHeight
@@ -172,11 +162,11 @@ const InterviewSession = () => {
   const summaryMetrics = useMemo(() => {
     if (!responses.length) return { overall: 0, relevance: 0, depth: 0, communication: 0 }
     const totals = responses.reduce(
-      (accumulator, r) => ({
-        overall: accumulator.overall + r.metrics.overall,
-        relevance: accumulator.relevance + r.metrics.relevance,
-        depth: accumulator.depth + r.metrics.depth,
-        communication: accumulator.communication + r.metrics.communication,
+      (acc, r) => ({
+        overall: acc.overall + r.metrics.overall,
+        relevance: acc.relevance + r.metrics.relevance,
+        depth: acc.depth + r.metrics.depth,
+        communication: acc.communication + r.metrics.communication,
       }),
       { overall: 0, relevance: 0, depth: 0, communication: 0 }
     )
@@ -189,7 +179,6 @@ const InterviewSession = () => {
     }
   }, [responses])
 
-  // Save to backend
   useEffect(() => {
     if (status !== 'complete' || saved || !session?.questions?.length) return
     let isMounted = true
@@ -223,85 +212,85 @@ const InterviewSession = () => {
 
   const replayQuestion = () => speak(question?.prompt, false)
 
-  const requestFollowUp = async () => {
-    if (!question || !answerDraft) return
-    setLoadingFollowUp(true)
-    try {
-      const response = await api.post('/ai/follow-up', {
-        question: question.prompt,
-        answer: answerDraft,
-        topic: session.summaryTopic || session.modeName,
-        difficulty: session.summaryDifficulty || 'medium'
-      })
-      setFollowUpQuestion(response.data.followUpQuestion)
-      setIsFollowUpMode(true)
-      speak(response.data.followUpQuestion, muted)
-    } catch (error) {
-      setHint('Failed to generate follow-up question.')
-    } finally {
-      setLoadingFollowUp(false)
-    }
-  }
-
   const handleSubmit = async () => {
     if (!question) return
     window.speechSynthesis.cancel()
     stopRecording()
-    
+
     setLoadingFollowUp(true)
     setHint('Evaluating your answer...')
-    
+
     try {
       const response = await api.post('/ai/evaluate-answer', {
         question: question.prompt,
         answer: answerDraft,
         topic: session.summaryTopic || session.modeName
       })
-      
+
       const metrics = {
         overall: response.data.overall,
-        relevance: response.data.relevance,
-        depth: response.data.depth,
-        communication: response.data.communication,
         feedback: response.data.feedback,
         strengths: response.data.strengths,
-        improvements: response.data.improvements
+        improvements: response.data.improvements,
+        betterAnswer: response.data.betterAnswer
       }
-      
+
       const entry = { questionId: question.id, prompt: question.prompt, answer: answerDraft, metrics }
+
       setResponses((prev) => {
         const i = prev.findIndex((r) => r.questionId === question.id)
         if (i >= 0) { const next = [...prev]; next[i] = entry; return next }
         return [...prev, entry]
       })
+
       setFeedback(entry)
       setSubmitted(true)
       setHint('')
-      
-      // Automatically request follow-up
-      try {
-        const followUpResponse = await api.post('/ai/follow-up', {
-          question: question.prompt,
-          answer: answerDraft,
-          topic: session.summaryTopic || session.modeName,
-          difficulty: session.summaryDifficulty || 'medium'
-        })
-        setFollowUpQuestion(followUpResponse.data.followUpQuestion)
-        setIsFollowUpMode(true)
-        setTimeout(() => speak(followUpResponse.data.followUpQuestion, muted), 500)
-      } catch (error) {
-        setHint('Follow-up generation failed. You can move to the next question.')
+
+      if (currentQuestionIndex + 1 < session.questions.length) {
+        try {
+          const history = responses.map((r) => ({
+            question: r.prompt,
+            answer: r.answer
+          }))
+          history.push({ question: question.prompt, answer: answerDraft })
+
+          const followUpResponse = await api.post('/ai/follow-up', {
+            history,
+            topic: session.summaryTopic || session.modeName,
+            difficulty: session.summaryDifficulty || 'medium'
+          })
+
+          const newFollowUp = followUpResponse.data.followUpQuestion
+
+          if (newFollowUp) {
+            setSession((prev) => {
+              const newQuestions = [...prev.questions]
+              newQuestions[currentQuestionIndex + 1] = {
+                ...newQuestions[currentQuestionIndex + 1],
+                prompt: newFollowUp
+              }
+              return { ...prev, questions: newQuestions }
+            })
+          }
+        } catch (error) {
+          console.error('Follow-up generation failed:', error)
+        }
       }
+
     } catch (error) {
       console.error('Evaluation error:', error)
       setHint('Failed to evaluate answer. Using fallback scoring.')
+
       const metrics = scoreAnswer(answerDraft, question.prompt, session.summaryTopic || session.metaLabel)
       const entry = { questionId: question.id, prompt: question.prompt, answer: answerDraft, metrics }
+
       setResponses((prev) => {
         const i = prev.findIndex((r) => r.questionId === question.id)
         if (i >= 0) { const next = [...prev]; next[i] = entry; return next }
         return [...prev, entry]
       })
+
       setFeedback(entry)
       setSubmitted(true)
       setHint('')
@@ -316,8 +305,6 @@ const InterviewSession = () => {
     setFeedback(null)
     setSubmitted(false)
     setHint('')
-    setFollowUpQuestion(null)
-    setIsFollowUpMode(false)
     if (currentQuestionIndex + 1 >= session.questions.length) { setStatus('complete'); return }
     setCurrentQuestionIndex((v) => v + 1)
     setTimeLeft(session.timePerQuestionSeconds)
@@ -327,7 +314,6 @@ const InterviewSession = () => {
 
   return (
     <div className="interview-shell interview-shell--chat">
-      {/* ── Active session ── */}
       {status === 'active' && question && (
         <div className="interview-chat-app">
           <header className="interview-chat-header">
@@ -344,105 +330,74 @@ const InterviewSession = () => {
             </div>
           </header>
 
-          <div className="interview-chat-main">
-            {/* Thread + composer */}
-            <div className="interview-chat-thread-wrap">
-              <div className="interview-chat-thread" ref={threadRef}>
-
-                {/* Past Q&A */}
-                {session.questions.slice(0, currentQuestionIndex).map((q) => {
-                  const past = pastResponse(q.id)
-                  return (
-                    <div key={q.id} className="interview-chat-block">
-                      <div className="chat-row chat-row--assistant">
-                        <div className="chat-avatar">AI</div>
-                        <div className="chat-bubble chat-bubble--assistant">
-                          <p className="chat-bubble__text">{q.prompt}</p>
-                        </div>
-                      </div>
-                      {past && (
-                        <div className="chat-row chat-row--user">
-                          <div className="chat-bubble chat-bubble--user">
-                            <p className="chat-bubble__text">{past.answer.trim() || '…'}</p>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )
-                })}
-
-                {/* Current question */}
-                <div className="interview-chat-block">
-                  <div className="chat-row chat-row--assistant">
-                    <div className="chat-avatar">AI</div>
-                    <div className="chat-bubble chat-bubble--assistant">
-                      <p className="chat-bubble__text">{isFollowUpMode ? followUpQuestion : question.prompt}</p>
-                      {!isFollowUpMode && question.guidance ? (
-                        <p className="chat-bubble__hint">{question.guidance}</p>
-                      ) : null}
-                    </div>
-                  </div>
-
-                  {submitted && (
-                    <>
-                      <div className="chat-row chat-row--user">
-                        <div className="chat-bubble chat-bubble--user">
-                          <p className="chat-bubble__text">{answerDraft.trim() || 'No text — voice only.'}</p>
-                        </div>
-                      </div>
-
-                      {feedback && (
-                        <div className="chat-feedback">
-                          <div className="chat-feedback__score">
-                            Score: {feedback.metrics.overall * 10}/100
-                          </div>
-                          <div className="chat-feedback__grid">
-                            <ScorePill label="Relevance" value={feedback.metrics.relevance} />
-                            <ScorePill label="Depth" value={feedback.metrics.depth} />
-                            <ScorePill label="Communication" value={feedback.metrics.communication} />
-                          </div>
-                          <div className="chat-feedback__tags">
-                            {feedback.metrics.matched.length > 0 && (
-                              <span className="topic-badge topic-badge--success">
-                                ✓ {feedback.metrics.matched.join(', ')}
-                              </span>
-                            )}
-                            {feedback.metrics.missing.length > 0 && (
-                              <span className="topic-badge topic-badge--warning">
-                                Missing: {feedback.metrics.missing.join(', ')}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      )}
-                    </>
-                  )}
-                </div>
+          <div className="isession-two-col">
+            <div className="isession-left">
+              <div className="isession-video-box">
+                <video ref={videoRef} autoPlay muted playsInline className="isession-video-feed" />
+                <span className="isession-cam-label">
+                  {camReady ? '🟢 Camera' : '⚫ No camera'}
+                </span>
+                <span className={'isession-timer' + (timerWarning ? ' isession-timer--warn' : '')}>
+                  ⏱ {clock(timeLeft)}
+                </span>
               </div>
 
-              {/* Composer */}
-              {!submitted ? (
-                <div className="interview-chat-composer">
-                  {hint ? <p className="interview-chat-hint">{hint}</p> : null}
-
-                  <div className="interview-chat-composer__tools">
-                    <button type="button" className="interview-chat-chip" onClick={replayQuestion}>
-                      🔊 Read question
-                    </button>
-                    <button type="button" className="interview-chat-chip" onClick={() => setMuted((v) => !v)}>
-                      {muted ? '🔕 Sound off' : '🔔 Sound on'}
-                    </button>
+              <div className="isession-controls">
+                <button type="button" className="interview-chat-chip" onClick={replayQuestion}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg>
+                  Replay
+                </button>
+                <button type="button" className="interview-chat-chip" onClick={() => setMuted((v) => !v)}>
+                  {muted ? (
+                    <>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 5L6 9H2v6h4l5 4V5z"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>
+                      Muted
+                    </>
+                  ) : (
+                    <>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+                      Sound on
+                    </>
+                  )}
+                </button>
+                <button
+                  type="button"
+                  className={'interview-chat-chip' + (recording ? ' interview-chat-chip--recording' : '')}
+                  onClick={recording ? stopRecording : startRecording}
+                  disabled={!micSupported}
+                >
+                  {recording ? (
+                    <>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+                      Stop mic
+                    </>
+                  ) : (
+                    <>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+                      Mic
+                    </>
+                  )}
+                </button>
+                {recording && <span className="irecording-dot" />}
+                {!submitted && (
+                  <>
                     <button
                       type="button"
-                      className={'interview-chat-chip' + (recording ? ' interview-chat-chip--recording' : '')}
-                      onClick={recording ? stopRecording : startRecording}
-                      disabled={!micSupported}
+                      className="button button--destructive"
+                      onClick={() => { window.speechSynthesis.cancel(); setStatus('complete') }}
                     >
-                      {recording ? '⏹ Stop mic' : '🎙 Use mic'}
+                      End early
                     </button>
-                    {recording && <span className="irecording-dot" />}
-                  </div>
+                    <button type="button" className="button button--primary" onClick={handleSubmit}>
+                      Submit →
+                    </button>
+                  </>
+                )}
+              </div>
 
+              {!submitted ? (
+                <div className="isession-composer">
+                  {hint ? <p className="interview-chat-hint">{hint}</p> : null}
                   <textarea
                     className="interview-chat-textarea"
                     value={answerDraft}
@@ -450,104 +405,94 @@ const InterviewSession = () => {
                     placeholder="Type your answer or use the mic…"
                     rows={4}
                   />
-
-                  <div className="interview-chat-composer__actions">
-                    <button
-                      type="button"
-                      className="button button--secondary"
-                      onClick={() => {
-                        window.speechSynthesis.cancel()
-                        setStatus('complete')
-                      }}
-                    >
-                      End early
-                    </button>
-                    <button type="button" className="button button--primary" onClick={handleSubmit}>
-                      Send →
-                    </button>
-                  </div>
+                  <div className="interview-chat-wordcount">{answerDraft.trim().split(/\s+/).filter(w => w).length} words</div>
                 </div>
               ) : (
-                <div className="interview-chat-composer interview-chat-composer--after">
+                <div className="isession-composer">
                   {hint ? <p className="interview-chat-hint">{hint}</p> : null}
-                  
                   {loadingFollowUp ? (
                     <div style={{ textAlign: 'center', padding: '12px', color: 'var(--textMedium)' }}>
-                      🔄 Generating follow-up question...
+                      Evaluating your answer…
                     </div>
-                  ) : isFollowUpMode && followUpQuestion ? (
-                    <>
-                      <div className="chat-bubble chat-bubble--assistant" style={{ margin: '0 0 12px 0' }}>
-                        <p className="chat-bubble__text">{followUpQuestion}</p>
-                      </div>
-                      <div className="interview-chat-composer__actions">
-                        <button
-                          type="button"
-                          className="button button--secondary"
-                          onClick={() => setIsFollowUpMode(false)}
-                        >
-                          Skip follow-up
-                        </button>
-                        <button
-                          type="button"
-                          className="button button--primary"
-                          onClick={() => {
-                            setAnswerDraft('')
-                            setSubmitted(false)
-                          }}
-                        >
-                          Answer follow-up
-                        </button>
-                      </div>
-                    </>
                   ) : (
                     <button type="button" className="button button--primary interview-chat-next" onClick={goNext}>
                       {currentQuestionIndex + 1 === session.questions.length ? '🏁 Finish' : 'Next question →'}
                     </button>
                   )}
+                  {submitted && feedback && (
+                    <div className="chat-feedback" style={{ marginTop: '12px' }}>
+                      <div className="chat-feedback__score">Score: {feedback.metrics.overall * 10}/100</div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
 
-            {/* Sidebar */}
-            <aside className="interview-chat-sidebar">
-              <div className="interview-chat-progress">
-                <div className="interview-chat-progress__label">
-                  Question {currentQuestionIndex + 1} of {session.questions.length}
-                </div>
-                <div className="interview-chat-progress__bar">
-                  <span style={{ width: `${progress}%` }} />
-                </div>
+            <aside className="isession-right">
+              <div className="isession-qlist-header">
+                <span className="isession-qlist-title">Question list</span>
+                <span className="interview-chat-qcount">{currentQuestionIndex + 1} / {session.questions.length}</span>
               </div>
 
-              <div className="interview-chat-video">
-                <video ref={videoRef} autoPlay muted playsInline className="interview-chat-video__feed" />
-                <span className="interview-chat-video__label">
-                  {camReady ? '🟢 Camera' : '⚫ No camera'}
-                </span>
+              <div className="interview-chat-progress__bar" style={{ marginBottom: '14px' }}>
+                <span style={{ width: `${progress}%` }} />
               </div>
 
-              <div className="isession-meta">
-                <span>{session.summaryTopic || session.modeName}</span>
-                <span>{session.summaryDifficulty || '—'}</span>
+              <div className="isession-qlist" ref={threadRef}>
+                {session.questions.map((q, idx) => {
+                  const past = pastResponse(q.id)
+                  const isCurrent = idx === currentQuestionIndex
+                  const isDone = idx < currentQuestionIndex || (isCurrent && submitted)
+                  const isLocked = idx > currentQuestionIndex
+
+                  return (
+                    <div
+                      key={q.id}
+                      className={
+                        'isession-qitem' +
+                        (isCurrent ? ' isession-qitem--active' : '') +
+                        (isDone ? ' isession-qitem--done' : '') +
+                        (isLocked ? ' isession-qitem--locked' : '')
+                      }
+                    >
+                      <div className="isession-qitem-num">
+                        {isDone ? '✓' : idx + 1}
+                      </div>
+                      <div className="isession-qitem-body">
+                        {isLocked ? (
+                          <p className="isession-qitem-text isession-qitem-text--hidden">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{marginRight: '6px'}}><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                            Locked
+                          </p>
+                        ) : (
+                          <p className="isession-qitem-text">{q.prompt}</p>
+                        )}
+                        {isDone && past && (
+                          <p className="isession-qitem-score">Score: {past.metrics.overall * 10}/100</p>
+                        )}
+                        {isCurrent && !submitted && (
+                          <span className="isession-qitem-badge">Answering now</span>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
               </div>
             </aside>
           </div>
         </div>
       )}
 
-      {/* ── Summary ── */}
       {status === 'complete' && (
         <main className="interview-session-page interview-summary-page">
           <Link to="/interview" className="back-link">← New session</Link>
 
           <section className="interview-summary-notion">
-            <span className="ihub-badge">Session complete</span>
             <h1 className="interview-summary-notion__title">Session notes</h1>
             <p className="interview-summary-notion__meta">
-              {session.summaryTopic || session.modeName}
+              {(session.summaryTopic || session.modeName).charAt(0).toUpperCase() + (session.summaryTopic || session.modeName).slice(1)}
               <span className="interview-summary-notion__dot">·</span>
-              {session.summaryDifficulty || session.metaLabel}
+              {(session.summaryDifficulty || session.metaLabel).charAt(0).toUpperCase() + (session.summaryDifficulty || session.metaLabel).slice(1)}
             </p>
 
             <div className="isummary-score-card">
@@ -555,23 +500,7 @@ const InterviewSession = () => {
                 <span className="isummary-score-card__num">{summaryMetrics.overall * 10}</span>
                 <span className="isummary-score-card__label">/ 100</span>
               </div>
-              <p className="isummary-score-card__note">
-                AI-powered evaluation
-              </p>
-            </div>
-
-            <div className="interview-summary-grid interview-summary-grid--notion">
-              {[
-                ['Relevance', summaryMetrics.relevance],
-                ['Depth', summaryMetrics.depth],
-                ['Communication', summaryMetrics.communication],
-                ['Overall', summaryMetrics.overall],
-              ].map(([label, value]) => (
-                <article key={label} className="summary-metric">
-                  <span>{label}</span>
-                  <strong>{value} / 10</strong>
-                </article>
-              ))}
+              <p className="isummary-score-card__note">AI-powered evaluation</p>
             </div>
 
             <h2 className="interview-summary-notion__h2">Per question</h2>
@@ -588,20 +517,21 @@ const InterviewSession = () => {
                       <strong>Feedback:</strong> {r.metrics.feedback}
                     </p>
                   )}
+                  {r.metrics.betterAnswer && (
+                    <p className="notion-block__better">
+                      <strong>Better answer:</strong> {r.metrics.betterAnswer}
+                    </p>
+                  )}
                   {r.metrics.strengths && r.metrics.strengths.length > 0 && (
                     <div className="notion-block__list">
                       <strong>Strengths:</strong>
-                      <ul>
-                        {r.metrics.strengths.map((s, i) => <li key={i}>{s}</li>)}
-                      </ul>
+                      <ul>{r.metrics.strengths.map((s, i) => <li key={i}>{s}</li>)}</ul>
                     </div>
                   )}
                   {r.metrics.improvements && r.metrics.improvements.length > 0 && (
                     <div className="notion-block__list">
                       <strong>Improvements:</strong>
-                      <ul>
-                        {r.metrics.improvements.map((imp, i) => <li key={i}>{imp}</li>)}
-                      </ul>
+                      <ul>{r.metrics.improvements.map((imp, i) => <li key={i}>{imp}</li>)}</ul>
                     </div>
                   )}
                 </article>

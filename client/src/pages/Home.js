@@ -190,9 +190,6 @@ const Home = () => {
 
         <section className="stripe-section scroll-animate" id="features">
           <h2 className="stripe-section__title">What you can do here</h2>
-          <p className="stripe-section__subtitle">
-            Six things, described plainly. If something breaks, refresh the page — we are not a huge team.
-          </p>
           <ul className="stripe-feature-grid">
             {features.map((feature) => (
               <li key={feature.title} className="stripe-feature-card">

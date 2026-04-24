@@ -4,9 +4,11 @@ import { AuthContext } from '../context/AuthContext'
 import api from '../services/api'
 
 const roles = ['Software Engineer', 'Frontend Engineer', 'Backend Engineer', 'Data Analyst', 'Full Stack Engineer']
-const difficulties = ['Easy (Junior)', 'Medium (Mid Level)', 'Hard (Senior Level)']
+const difficulties = ['Easy (Junior)', 'Hard (Senior Level)']
 const questionOptions = ['5 Questions', '8 Questions', '10 Questions']
 const timeOptions = ['1 minute', '2 minutes', '3 minutes']
+const personalities = ['Standard', 'Strict', 'Friendly', 'FAANG']
+const companies = ['None', 'Google', 'Amazon', 'Meta', 'Startup']
 
 const ResumeInterview = () => {
   const { user } = useContext(AuthContext)
@@ -14,9 +16,11 @@ const ResumeInterview = () => {
 
   const [form, setForm] = useState({
     role: 'Software Engineer',
-    difficulty: 'Medium (Mid Level)',
+    difficulty: 'Easy (Junior)',
     questions: '8 Questions',
     timePerQuestion: '2 minutes',
+    personality: 'Standard',
+    company: 'None',
   })
   const [resumeText, setResumeText] = useState('')
   const [error, setError] = useState('')
@@ -43,6 +47,8 @@ const ResumeInterview = () => {
         role: form.role,
         difficulty: form.difficulty,
         questionCount,
+        personality: form.personality.toLowerCase(),
+        company: form.company.toLowerCase(),
       })
 
       const questions = response.data.questions
@@ -73,9 +79,7 @@ const ResumeInterview = () => {
         <Link to="/interview" className="back-link">← Back</Link>
 
         <div className="iresume-header">
-          <span className="ihub-badge">Resume mode</span>
           <h1>🎙 AI Resume Interview</h1>
-          <p>Upload your resume and face questions built around your actual experience, skills, and projects.</p>
         </div>
 
         <div className="iresume-layout">
@@ -100,8 +104,38 @@ const ResumeInterview = () => {
 
             <label className="form-group">
               <span>Difficulty</span>
-              <select value={form.difficulty} onChange={(e) => set('difficulty', e.target.value)}>
-                {difficulties.map((d) => <option key={d}>{d}</option>)}
+              <div className="difficulty-cards">
+                {difficulties.map((d) => (
+                  <div
+                    key={d}
+                    className={`difficulty-card ${form.difficulty === d ? 'difficulty-card--active' : ''}`}
+                    onClick={() => set('difficulty', d)}
+                  >
+                    {d}
+                  </div>
+                ))}
+              </div>
+            </label>
+
+            <label className="form-group">
+              <span>Interviewer style</span>
+              <div className="style-cards">
+                {personalities.map((p) => (
+                  <div
+                    key={p}
+                    className={`style-card ${form.personality === p ? 'style-card--active' : ''}`}
+                    onClick={() => set('personality', p)}
+                  >
+                    {p}
+                  </div>
+                ))}
+              </div>
+            </label>
+
+            <label className="form-group">
+              <span>Company style</span>
+              <select value={form.company} onChange={(e) => set('company', e.target.value)}>
+                {companies.map((c) => <option key={c}>{c}</option>)}
               </select>
             </label>
 
@@ -120,13 +154,6 @@ const ResumeInterview = () => {
                 </select>
               </label>
             </div>
-
-            <ul className="iresume-features">
-              <li><span>🧠</span> AI reads your skills &amp; projects</li>
-              <li><span>🎯</span> Questions tailored to your resume</li>
-              <li><span>🎙</span> Speech-to-text transcription</li>
-              <li><span>📊</span> Per-answer feedback &amp; scores</li>
-            </ul>
           </section>
 
           {/* Upload panel */}
@@ -141,28 +168,20 @@ const ResumeInterview = () => {
               rows={15}
               style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #ddd', fontFamily: 'monospace' }}
             />
+            <div className="iresume-wordcount">{resumeText.trim().split(/\s+/).filter(w => w).length} words</div>
 
-            <div className="iresume-what">
-              <p className="iresume-what__label">What happens next</p>
-              <ol className="iresume-steps">
-                <li>AI analyzes your resume content</li>
-                <li>Questions are generated based on your role &amp; resume</li>
-                <li>Interview starts — answer by typing or speaking</li>
-              </ol>
-            </div>
+            {error ? <p className="inline-error">{error}</p> : null}
+
+            <button
+              type="button"
+              className="button button--primary full-width-cta"
+              onClick={handleStart}
+              disabled={loading}
+            >
+              {loading ? 'Generating questions...' : 'Start Interview'}
+            </button>
           </section>
         </div>
-
-        {error ? <p className="inline-error inline-error--wide">{error}</p> : null}
-
-        <button
-          type="button"
-          className="button button--primary full-width-cta"
-          onClick={handleStart}
-          disabled={loading}
-        >
-          {loading ? 'Generating questions...' : 'Start resume interview →'}
-        </button>
       </main>
     </div>
   )

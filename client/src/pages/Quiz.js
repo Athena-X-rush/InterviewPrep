@@ -107,6 +107,11 @@ const LoadingView = ({ activeStep }) => (
 const ResultsView = ({ answers, score, onRestart, config }) => (
   <main className="quiz-results-page quiz-results-page--duo">
     <section className="quiz-results-card quiz-results-card--duo">
+      <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: '16px' }}>
+        <button type="button" className="button button--secondary" onClick={onRestart}>
+          ← Leave
+        </button>
+      </div>
       <div className="duo-result-hero" aria-hidden="true">
         <span>{score === answers.length ? '🎉' : score >= answers.length / 2 ? '👍' : '📝'}</span>
       </div>
@@ -145,10 +150,6 @@ const ResultsView = ({ answers, score, onRestart, config }) => (
           </article>
         ))}
       </div>
-
-      <button type="button" className="duo-start-btn duo-start-btn--wide" onClick={onRestart}>
-        Again
-      </button>
     </section>
   </main>
 )
@@ -171,7 +172,8 @@ const Quiz = () => {
     startQuiz,
     chooseOption,
     submitAnswer,
-    resetQuiz
+    resetQuiz,
+    endEarly
   } = useQuiz()
 
   const [form, setForm] = useState({
@@ -335,6 +337,9 @@ const Quiz = () => {
         <main className="quiz-active-page quiz-active-page--duo">
           <section className="quiz-toolbar quiz-toolbar--duo">
             <Timer seconds={timeLeft} className="timer-pill--duo" />
+            <button type="button" className="button button--destructive" onClick={endEarly}>
+              End early
+            </button>
           </section>
 
           <section className="quiz-progress-panel quiz-progress-panel--duo">

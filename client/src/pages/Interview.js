@@ -93,10 +93,6 @@ const Interview = () => {
             <p className="ihub-sidebar__label">Other modes</p>
             <ModeCard to="/interview/resume" icon="🎙" title="Resume interview" desc="Tailored to your uploaded resume" />
             <ModeCard to="/interview/document" icon="📄" title="Document interview" desc="From your own Q&A files" />
-            <div className="ihub-tip">
-              <span>💡</span>
-              <p>Camera and mic stay in your browser — nothing leaves your device.</p>
-            </div>
           </aside>
 
           {/* Main form card */}
