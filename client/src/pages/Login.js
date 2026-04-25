@@ -79,11 +79,11 @@ const Login = () => {
           </div>
 
           <div className="auth-card__copy">
-            <h2>{mode === 'login' ? 'Welcome back' : 'Create your account'}</h2>
+            <h2>{mode === 'login' ? 'Welcome back' : 'Create an account'}</h2>
             <p>
               {mode === 'login'
-                ? 'Use your email and password to continue into the protected experience.'
-                : 'Start with a name, email, and password to generate your first signed session.'}
+                ? 'Log in with your email and password to continue.'
+                : 'Enter your name, email, and password to get started.'}
             </p>
           </div>
 
@@ -130,7 +130,7 @@ const Login = () => {
             {error ? <p className="auth-error">{error}</p> : null}
 
             <button className="button button--primary auth-submit" type="submit" disabled={isSubmitting}>
-              {isSubmitting ? 'Please wait...' : mode === 'login' ? 'Login' : 'Create account'}
+              {isSubmitting ? 'Please wait...' : mode === 'login' ? 'Log in' : 'Create account'}
             </button>
           </form>
 
@@ -140,16 +140,13 @@ const Login = () => {
               type="button"
               className="auth-switch__button"
               onClick={() => {
-                setMode(mode === 'login' ? 'register' : 'login')
+                const nextMode = mode === 'login' ? 'register' : 'login'
+                setMode(nextMode)
                 setError('')
               }}
             >
-              {mode === 'login' ? 'Register now' : 'Log in'}
+              {mode === 'login' ? 'Create one' : 'Log in'}
             </button>
-          </p>
-
-          <p className="auth-footnote">
-            Protected pages include <Link to="/dashboard">Dashboard</Link> and <Link to="/quiz">Quiz</Link>.
           </p>
         </section>
       </main>

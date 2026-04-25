@@ -30,7 +30,7 @@ const Interview = () => {
   const [checking, setChecking] = useState(false)
   const [loading, setLoading] = useState(false)
 
-  const set = (key, val) => setForm((f) => ({ ...f, [key]: val }))
+  const updateForm = (key, val) => setForm((f) => ({ ...f, [key]: val }))
 
   const checkDevices = async () => {
     setChecking(true)
@@ -80,7 +80,7 @@ const Interview = () => {
     }
   }
 
-  const bothReady = devices.camera && devices.microphone
+  const devicesReady = devices.camera && devices.microphone
 
   return (
     <div className="interview-shell interview-shell--hub">
@@ -100,7 +100,7 @@ const Interview = () => {
             <div className="ihub-card__head">
               <span className="ihub-badge">New session</span>
               <h1>Interview practice</h1>
-              <p>Pick a topic, answer questions one at a time, get instant feedback on each response.</p>
+              <p>Choose a topic, answer one question at a time, and review the feedback after each response.</p>
             </div>
 
             <div className="ihub-form">
@@ -108,16 +108,16 @@ const Interview = () => {
                 <span>Topic</span>
                 <input
                   type="text"
-                  placeholder="e.g. OOP, System Design, React hooks"
+                  placeholder="e.g. OOP, system design, React hooks"
                   value={form.topic}
-                  onChange={(e) => { set('topic', e.target.value); setError('') }}
+                  onChange={(e) => { updateForm('topic', e.target.value); setError('') }}
                 />
               </label>
 
               <div className="ihub-row">
                 <label className="form-group">
                   <span>Difficulty</span>
-                  <select value={form.difficulty} onChange={(e) => set('difficulty', e.target.value)}>
+                  <select value={form.difficulty} onChange={(e) => updateForm('difficulty', e.target.value)}>
                     <option>Easy</option>
                     <option>Medium</option>
                     <option>Hard</option>
@@ -126,7 +126,7 @@ const Interview = () => {
 
                 <label className="form-group">
                   <span>Questions</span>
-                  <select value={String(form.questions)} onChange={(e) => set('questions', Number(e.target.value))}>
+                  <select value={String(form.questions)} onChange={(e) => updateForm('questions', Number(e.target.value))}>
                     <option value="4">4</option>
                     <option value="6">6</option>
                     <option value="8">8</option>
@@ -138,7 +138,7 @@ const Interview = () => {
                   <span>Time / Q</span>
                   <select
                     value={String(form.timePerQuestion)}
-                    onChange={(e) => set('timePerQuestion', Number(e.target.value))}
+                    onChange={(e) => updateForm('timePerQuestion', Number(e.target.value))}
                   >
                     <option value="60">1 min</option>
                     <option value="120">2 min</option>
@@ -157,24 +157,24 @@ const Interview = () => {
                 </div>
                 <button
                   type="button"
-                  className={'idevice-btn' + (bothReady ? ' idevice-btn--done' : '')}
+                  className={'idevice-btn' + (devicesReady ? ' idevice-btn--done' : '')}
                   onClick={checkDevices}
                   disabled={checking}
                 >
-                  {checking ? 'Checking…' : bothReady ? '✓ Devices ready' : '🔐 Allow camera & mic'}
+                  {checking ? 'Checking…' : devicesReady ? '✓ Devices ready' : '🔐 Allow camera & mic'}
                 </button>
               </div>
 
               {devices.message ? <p className="inline-message">{devices.message}</p> : null}
               {error ? <p className="inline-error">{error}</p> : null}
 
-              <button 
-                type="button" 
-                className="button button--primary interview-submit" 
+              <button
+                type="button"
+                className="button button--primary interview-submit"
                 onClick={handleStart}
                 disabled={loading}
               >
-                {loading ? 'Generating questions...' : 'Start interview →'}
+                {loading ? 'Preparing questions...' : 'Start interview →'}
               </button>
             </div>
           </section>

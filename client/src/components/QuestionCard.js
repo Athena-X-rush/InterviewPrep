@@ -1,4 +1,4 @@
-import React from 'react';
+import React from 'react'
 
 const alphabet = ['A', 'B', 'C', 'D', 'E', 'F'];
 
@@ -7,6 +7,7 @@ const QuestionCard = ({
   selectedOption,
   onSelect,
   onConfirm,
+  onPrevious,
   currentIndex,
   totalQuestions,
 }) => (
@@ -37,15 +38,25 @@ const QuestionCard = ({
       })}
     </div>
 
-    <button
-      type="button"
-      className="button quiz-confirm quiz-confirm--duo"
-      onClick={onConfirm}
-      disabled={!selectedOption}
-    >
-      {currentIndex + 1 === totalQuestions ? 'Finish lesson' : 'Submit Answer'}
-    </button>
+    <div className="quiz-card__actions">
+      <button
+        type="button"
+        className="button button--secondary"
+        onClick={onPrevious}
+        disabled={currentIndex === 0}
+      >
+        Previous
+      </button>
+      <button
+        type="button"
+        className="button quiz-confirm quiz-confirm--duo"
+        onClick={onConfirm}
+        disabled={!selectedOption}
+      >
+        {currentIndex + 1 === totalQuestions ? 'Finish lesson' : 'Submit Answer'}
+      </button>
+    </div>
   </section>
-);
+)
 
-export default QuestionCard;
+export default QuestionCard

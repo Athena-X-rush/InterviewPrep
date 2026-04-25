@@ -24,10 +24,10 @@ export const generateResumeQuestions = async (req, res) => {
     };
 
     const base = `You are a technical interviewer conducting a ${difficulty || 'medium'} difficulty interview for a ${role} position.`;
-    const personalityPrompt = personalityPrompts[personality] || '';
+    const personalityStyle = personalityPrompts[personality] || '';
     const companyStyle = companyPrompts[company] || '';
 
-    const systemPrompt = `${base} ${personalityPrompt} ${companyStyle}
+    const systemPrompt = `${base} ${personalityStyle} ${companyStyle}
 
 Based on the candidate's resume content below, generate ${questionCount || 8} UNIQUE interview questions. CRITICAL: Each question must be completely different from the others. No duplicates, no similar questions, no variations of the same concept.
 
@@ -189,17 +189,18 @@ Example output: ["Redis cache eviction policy", "fan-out on write", "vector cloc
       messages: [
         {
           role: 'system',
-          content: `You are a strict technical interviewer. Ask ONE deep follow-up question on the concept given.
+          content: `You are a strict technical interviewer. Ask ONE follow-up question on the concept given.
 Rules:
-- Go deeper technically on that exact concept
-- Be very specific, not general
+- Stay at the same difficulty level as the original question — do not go deeper into advanced internals
+- Ask about practical understanding, not compiler internals, bytecode, or JVM specifics unless the candidate explicitly mentioned those things
+- Be specific to what the candidate said, not generic
 - 1 sentence only
-- Do not introduce new topics
+- Do not introduce new topics the candidate did not mention
 - Return ONLY the question, nothing else`
         },
         {
           role: 'user',
-          content: `The candidate was asked: "${lastQuestion}"\n\nThey mentioned: "${picked}"\n\nAsk one deep technical follow-up question specifically about this.`
+          content: `The original question difficulty is: ${difficulty || 'medium'}\n\nThe candidate was asked: "${lastQuestion}"\n\nThey mentioned: "${picked}"\n\nAsk one follow-up question at the same difficulty level about this specific concept.`
         }
       ],
       max_tokens: 100,
@@ -306,7 +307,17 @@ export const evaluateAnswer = async (req, res) => {
 
     const groqClient = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
-    const systemPrompt = `You are a technical interviewer evaluating a candidate's answer.
+    const systemPrompt = `You are a strict technical interviewer evaluating a candidate's answer.
+
+Scoring rules:
+- If the answer is identical to the question or just repeats it: score 1
+- If the answer is mostly the question with minor changes: score 2
+- If the answer is too short or vague: score 2-4
+- If the answer shows understanding but lacks depth: score 5-6
+- If the answer is good with clear explanation: score 7-8
+- If the answer is excellent with deep insight: score 9-10
+
+IMPORTANT: Check if the answer text is the same as or very similar to the question text. If so, give score 1 or 2.
 
 Provide a JSON response with this exact structure:
 {
@@ -314,7 +325,13 @@ Provide a JSON response with this exact structure:
   "feedback": string (brief constructive feedback),
   "strengths": array of strings,
   "improvements": array of strings,
-  "betterAnswer": string (a better version of the answer)
+  "betterAnswer": string (MUST be a string, not an array) — write this as numbered points only, each on its own line. Follow this exact format:
+1. First point here
+2. Second point here
+3. Third point here
+Example: show a short concrete example here if the question involves code or implementation
+
+CRITICAL: betterAnswer MUST be a string type, not an array. Use newline characters \\n between points.
 }
 
 Return ONLY the JSON. No markdown, no backticks, no extra text.`;
@@ -337,7 +354,7 @@ Return ONLY the JSON. No markdown, no backticks, no extra text.`;
     try {
       const cleaned = raw.replace(/```json/g, '').replace(/```/g, '').trim();
       evaluation = JSON.parse(cleaned);
-    } catch {
+    } catch (err) {
       evaluation = {
         overall: 5,
         feedback: 'Could not parse AI evaluation.',
@@ -421,5 +438,177 @@ Return ONLY a JSON array with this exact structure, no markdown, no backticks:
   } catch (err) {
     console.error('Groq API error:', err);
     res.status(500).json({ message: 'Failed to generate questions', error: err.message });
+  }
+};
+
+
+export const generateStudyPlan = async (req, res) => {
+  try {
+    const { sessionData } = req.body;
+
+    if (!sessionData) {
+      return res.status(400).json({ message: 'Session data is required' });
+    }
+
+    const groqClient = new Groq({ apiKey: process.env.GROQ_API_KEY });
+
+    const step1 = await groqClient.chat.completions.create({
+      model: 'llama-3.3-70b-versatile',
+      messages: [
+        {
+          role: 'system',
+          content: `You are analyzing interview performance. Look at the questions, answers, and scores.
+Find the topics where the candidate struggled (score below 6).
+Return ONLY a JSON array of objects. No markdown, no backticks, no extra text.
+
+Each object must have:
+- topic: string (the BROAD skill they need to improve — e.g. "Method Overriding in OOP" not "dynamic method dispatch bytecode invokevirtual". Keep it simple and human-readable, not a copy of the question)
+- why: string (one sentence — what specifically they got wrong or missed in their answer)
+- score: number (their score out of 10)
+
+Example:
+[
+  { "topic": "React useState", "why": "Did not explain how state updates trigger re-renders", "score": 4 },
+  { "topic": "CSS Flexbox", "why": "Confused flex-grow and flex-shrink behavior", "score": 3 }
+]`
+        },
+        {
+          role: 'user',
+          content: `Here is the interview session data:\n${JSON.stringify(sessionData, null, 2)}\n\nFind the weak topics. Remember: topic must be a broad readable skill name, not a copy of the question text.`
+        }
+      ],
+      max_tokens: 400,
+      temperature: 0.3,
+    });
+
+    let weakTopics = [];
+    try {
+      const text = step1.choices[0]?.message?.content?.trim() || '[]';
+      const cleaned = text.replace(/```json/g, '').replace(/```/g, '').trim();
+      weakTopics = JSON.parse(cleaned);
+      if (!Array.isArray(weakTopics)) weakTopics = [];
+    } catch {
+      weakTopics = [];
+    }
+
+    if (weakTopics.length === 0) {
+      return res.json({ days: [] });
+    }
+
+    const topicsToStudy = weakTopics.slice(0, 3);
+    const topicList = topicsToStudy.map((t, i) => `Day ${i + 1}: ${t.topic}`).join('\n');
+
+    const step2 = await groqClient.chat.completions.create({
+      model: 'llama-3.3-70b-versatile',
+      messages: [
+        {
+          role: 'system',
+          content: `You are a study plan generator. Generate a day-by-day study plan.
+
+CRITICAL RULES FOR URLS:
+- resources must only use these reading/docs domains: react.dev, developer.mozilla.org, docs.python.org, javascript.info, web.dev, nodejs.org, docs.github.com, typescriptlang.org, nextjs.org, expressjs.com, mongodb.com/docs, postgresql.org/docs, redis.io/docs
+- practice must only use these hands-on coding domains: codepen.io, jsfiddle.net, exercism.org — these are places where the user can actually write and run code
+- Do NOT use docs sites for practice
+- Do NOT use coding sites for resources
+- Do NOT make up URLs
+- Do NOT use generic urls like "https://example.com"
+
+Return ONLY a JSON array. No markdown, no backticks, no extra text.
+Each item in the array must be a day object with this exact shape:
+{
+  "day": number,
+  "topic": string,
+  "why": string (one sentence — why this is in their plan, reference what they got wrong),
+  "duration": string (like "1-2 hrs"),
+  "resources": [
+    { "label": string, "url": string, "type": "docs" or "video" or "article" }
+  ],
+  "practice": { "label": string, "url": string }
+}`
+        },
+        {
+          role: 'user',
+          content: `The candidate struggled with these topics:\n${topicList}\n\nWeak topic details:\n${JSON.stringify(topicsToStudy, null, 2)}\n\nGenerate the day-by-day study plan JSON array.`
+        }
+      ],
+      max_tokens: 1000,
+      temperature: 0.4,
+    });
+
+    let days = [];
+    try {
+      const text = step2.choices[0]?.message?.content?.trim() || '[]';
+      const cleaned = text.replace(/```json/g, '').replace(/```/g, '').trim();
+      days = JSON.parse(cleaned);
+      if (!Array.isArray(days)) days = [];
+    } catch {
+      days = [];
+    }
+
+    res.json({ days });
+
+  } catch (err) {
+    console.error('Groq API error:', err);
+    res.status(500).json({ message: 'Failed to generate study plan', error: err.message });
+  }
+};
+
+
+export const detectResumeGaps = async (req, res) => {
+  try {
+    const { resumeText, role } = req.body;
+
+    if (!resumeText || !role) {
+      return res.status(400).json({ message: 'Resume text and role are required' });
+    }
+
+    const groqClient = new Groq({ apiKey: process.env.GROQ_API_KEY });
+
+    const aiResponse = await groqClient.chat.completions.create({
+      model: 'llama-3.3-70b-versatile',
+      messages: [
+        {
+          role: 'system',
+          content: `You are a resume reviewer. Analyze the resume for a ${role} position and find gaps, weak spots, and missing things.
+
+Return ONLY a JSON array of objects. No markdown, no backticks, no extra text.
+Each object must have:
+- type: string — either "missing", "weak", or "suggestion"
+- text: string — one short sentence describing the gap or suggestion
+
+Keep it to max 6 items. Be specific to the role. Do not be generic.
+
+Example:
+[
+  { "type": "missing", "text": "No mention of database experience for a backend role" },
+  { "type": "weak", "text": "Projects section lacks specific technologies used" },
+  { "type": "suggestion", "text": "Add metrics to quantify achievements like users served or performance gains" }
+]`
+        },
+        {
+          role: 'user',
+          content: `Role: ${role}\n\nResume:\n${resumeText}\n\nFind gaps and suggestions.`
+        }
+      ],
+      max_tokens: 400,
+      temperature: 0.4,
+    });
+
+    const raw = aiResponse.choices[0]?.message?.content?.trim() || '[]';
+
+    let gaps = [];
+    try {
+      const cleaned = raw.replace(/```json/g, '').replace(/```/g, '').trim();
+      gaps = JSON.parse(cleaned);
+      if (!Array.isArray(gaps)) gaps = [];
+    } catch {
+      gaps = [];
+    }
+
+    res.json({ gaps });
+
+  } catch (err) {
+    console.error('Groq API error:', err);
+    res.status(500).json({ message: 'Failed to analyze resume', error: err.message });
   }
 };

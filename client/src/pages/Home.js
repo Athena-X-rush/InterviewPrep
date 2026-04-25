@@ -11,27 +11,27 @@ import heroAnim3 from '../assets/animations/3.png'
 const features = [
   {
     title: 'Quizzes',
-    description: 'Short sessions on whatever topic you type in. Nothing fancy — just questions, a timer, and a score at the end.'
+    description: 'Pick a topic, answer a few questions, and see how you did at the end.'
   },
   {
     title: 'Interview practice',
-    description: 'Talk through prompts with your mic and camera on, or stick to typing. Good for nervous energy, not perfect answers.'
+    description: 'Practice answering interview questions with your mic and camera, or just type if that feels easier.'
   },
   {
     title: 'Resume & docs',
-    description: 'Upload a file and practice answers that relate to what you actually wrote.'
+    description: 'Use your own resume or study notes so the questions stay closer to what you are preparing for.'
   },
   {
     title: 'Leaderboard',
-    description: 'Points add up over time. Mostly so you can see if you are showing up consistently.'
+    description: 'Your points build up over time so you can track your progress across sessions.'
   },
   {
     title: 'Dashboard',
-    description: 'Rank, points, and how you compare to the top score right now — all in one place.'
+    description: 'See your score, rank, and a simple summary of how your recent practice is going.'
   },
   {
     title: 'Works in the browser',
-    description: 'No desktop app. Log in, pick a mode, go. (You will need a mic for some interview modes.)'
+    description: 'Everything runs in the browser, so you can log in and start without installing anything.'
   }
 ]
 
@@ -45,9 +45,9 @@ const Home = () => {
     rank: null
   })
 
-  const accuracyScore = Math.max(0, Math.min(100, Math.round(userStats.averageAccuracy || 0)))
+  const accuracy = Math.max(0, Math.min(100, Math.round(userStats.averageAccuracy || 0)))
 
-  const activityBars = useMemo(() => {
+  const statsRows = useMemo(() => {
     const totalAttempts = Math.max(1, userStats.quizAttempts + userStats.interviewAttempts)
     const quizShare = Math.round((userStats.quizAttempts / totalAttempts) * 100)
     const interviewShare = Math.round((userStats.interviewAttempts / totalAttempts) * 100)
@@ -55,26 +55,9 @@ const Home = () => {
     return [
       { label: 'Quiz share', value: quizShare + '%' },
       { label: 'Interview share', value: interviewShare + '%' },
-      { label: 'Avg. accuracy (rough)', value: accuracyScore + '%' }
+      { label: 'Avg. accuracy (rough)', value: accuracy + '%' }
     ]
-  }, [userStats.averageAccuracy, userStats.interviewAttempts, userStats.quizAttempts, accuracyScore])
-
-  useEffect(() => {
-    if (!isAuthenticated) {
-      return
-    }
-
-    const fetchStats = async () => {
-      try {
-        const response = await api.get('/api/daily-summary')
-        setUserStats(response.data)
-      } catch (error) {
-        console.error('Failed to fetch stats:', error)
-      }
-    }
-
-    fetchStats()
-  }, [isAuthenticated])
+  }, [userStats.averageAccuracy, userStats.interviewAttempts, userStats.quizAttempts, accuracy])
 
   useEffect(() => {
     const observer = new IntersectionObserver((entries) => {
@@ -125,15 +108,15 @@ const Home = () => {
             <img src={heroAnim3} alt="" className="stripe-hero__anim-image stripe-hero__anim-image--3" />
           </div>
           <div className="stripe-hero__content">
-            <p className="stripe-hero__label">Prep for tech interviews & quizzes</p>
+            <p className="stripe-hero__label">Interview and quiz practice</p>
             <h1 className="stripe-hero__title">
-              Everything in one place,
+              Practice in one place,
               <br />
-              without the clutter.
+              without switching tools.
             </h1>
             <p className="stripe-hero__lede">
-              PrepFlow is a small practice app: quizzes, mock interviews, and a simple report when you are done.
-              We are still improving it — feedback welcome.
+              PrepFlow is a practice app for quizzes, mock interviews, and quick progress tracking.
+              It is built to keep things simple and easy to use.
             </p>
             <div className="stripe-hero__cta">
               <Link to="/quiz" className="stripe-btn stripe-btn--primary">
@@ -158,14 +141,14 @@ const Home = () => {
               <div className="stripe-preview-card__body">
                 <div className="stripe-preview-metric">
                   <span>Readiness (rough)</span>
-                  <strong>{accuracyScore} / 100</strong>
+                  <strong>{accuracy} / 100</strong>
                 </div>
                 <div className="stripe-preview-metric">
                   <span>Total points</span>
                   <strong>{userStats.totalPoints}</strong>
                 </div>
                 <div className="stripe-preview-rows">
-                  {activityBars.map((row) => (
+                  {statsRows.map((row) => (
                     <div key={row.label} className="stripe-preview-row">
                       <span>{row.label}</span>
                       <span className="stripe-preview-row__bar">
@@ -184,7 +167,11 @@ const Home = () => {
             </div>
           </div>
           <div className="stripe-preview-illustration">
-            <img src={dashboardIllustration} alt="Dashboard illustration" className="stripe-preview-illustration__image" />
+            <img
+              src={dashboardIllustration}
+              alt="Dashboard illustration"
+              className="stripe-preview-illustration__image"
+            />
           </div>
         </div>
 
@@ -203,7 +190,10 @@ const Home = () => {
         <section className="stripe-band">
           <div className="stripe-band__inner">
             <h2>Pick a mode and go</h2>
-            <p>Quiz for speed. Interview for talking. Dashboard when you want the numbers.</p>
+            <p>
+              Use quiz mode for quick revision, interview mode for speaking practice, and the
+              dashboard for your progress.
+            </p>
             <div className="stripe-band__actions">
               <Link to="/quiz" className="stripe-btn stripe-btn--primary stripe-btn--sm">
                 Quiz

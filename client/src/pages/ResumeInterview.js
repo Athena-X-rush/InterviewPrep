@@ -10,6 +10,12 @@ const timeOptions = ['1 minute', '2 minutes', '3 minutes']
 const personalities = ['Standard', 'Strict', 'Friendly', 'FAANG']
 const companies = ['None', 'Google', 'Amazon', 'Meta', 'Startup']
 
+const gapIcon = (type) => {
+  if (type === 'missing') return '🔴'
+  if (type === 'weak') return '🟡'
+  return '💡'
+}
+
 const ResumeInterview = () => {
   const { user } = useContext(AuthContext)
   const navigate = useNavigate()
@@ -25,16 +31,42 @@ const ResumeInterview = () => {
   const [resumeText, setResumeText] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [gaps, setGaps] = useState([])
+  const [loadingGaps, setLoadingGaps] = useState(false)
+  const [gapsAnalyzed, setGapsAnalyzed] = useState(false)
 
   const userName = user?.name || 'Learner'
   const questionCount = Number(form.questions.split(' ')[0])
   const timePerQuestionSeconds = Number(form.timePerQuestion.split(' ')[0]) * 60
 
-  const set = (key, val) => setForm((f) => ({ ...f, [key]: val }))
+  const updateForm = (key, val) => setForm((f) => ({ ...f, [key]: val }))
+
+  const analyzeResume = async () => {
+    if (!resumeText || resumeText.trim().length < 50) {
+      setError('Need at least 50 characters to analyze.')
+      return
+    }
+    setError('')
+    setLoadingGaps(true)
+    setGapsAnalyzed(false)
+    try {
+      const res = await api.post('/ai/detect-resume-gaps', {
+        resumeText,
+        role: form.role,
+      })
+      setGaps(res.data.gaps || [])
+      setGapsAnalyzed(true)
+    } catch (err) {
+      console.error('Gap detection failed:', err)
+      setError('Failed to analyze resume. Try again.')
+    } finally {
+      setLoadingGaps(false)
+    }
+  }
 
   const handleStart = async () => {
     if (!resumeText || resumeText.trim().length < 50) {
-      setError('Please paste your resume content first (at least 50 characters).')
+      setError('Need at least 50 characters of resume text to start.')
       return
     }
 
@@ -83,21 +115,20 @@ const ResumeInterview = () => {
         </div>
 
         <div className="iresume-layout">
-          {/* Setup panel */}
           <section className="iresume-panel">
-            <h2>Session setup</h2>
+            <h2>Settings</h2>
 
             <div className="iresume-user-row">
               <div className="iresume-user-avatar">{userName[0]?.toUpperCase()}</div>
               <div>
                 <strong>{userName}</strong>
-                <small>Active candidate</small>
+                <small>Signed in</small>
               </div>
             </div>
 
             <label className="form-group">
-              <span>Target role</span>
-              <select value={form.role} onChange={(e) => set('role', e.target.value)}>
+              <span>Role</span>
+              <select value={form.role} onChange={(e) => updateForm('role', e.target.value)}>
                 {roles.map((r) => <option key={r}>{r}</option>)}
               </select>
             </label>
@@ -109,7 +140,7 @@ const ResumeInterview = () => {
                   <div
                     key={d}
                     className={`difficulty-card ${form.difficulty === d ? 'difficulty-card--active' : ''}`}
-                    onClick={() => set('difficulty', d)}
+                    onClick={() => updateForm('difficulty', d)}
                   >
                     {d}
                   </div>
@@ -118,13 +149,13 @@ const ResumeInterview = () => {
             </label>
 
             <label className="form-group">
-              <span>Interviewer style</span>
+              <span>Interviewer</span>
               <div className="style-cards">
                 {personalities.map((p) => (
                   <div
                     key={p}
                     className={`style-card ${form.personality === p ? 'style-card--active' : ''}`}
-                    onClick={() => set('personality', p)}
+                    onClick={() => updateForm('personality', p)}
                   >
                     {p}
                   </div>
@@ -133,8 +164,8 @@ const ResumeInterview = () => {
             </label>
 
             <label className="form-group">
-              <span>Company style</span>
-              <select value={form.company} onChange={(e) => set('company', e.target.value)}>
+              <span>Company</span>
+              <select value={form.company} onChange={(e) => updateForm('company', e.target.value)}>
                 {companies.map((c) => <option key={c}>{c}</option>)}
               </select>
             </label>
@@ -142,43 +173,82 @@ const ResumeInterview = () => {
             <div className="ihub-row">
               <label className="form-group">
                 <span>Questions</span>
-                <select value={form.questions} onChange={(e) => set('questions', e.target.value)}>
+                <select value={form.questions} onChange={(e) => updateForm('questions', e.target.value)}>
                   {questionOptions.map((q) => <option key={q}>{q}</option>)}
                 </select>
               </label>
 
               <label className="form-group">
                 <span>Time / Q</span>
-                <select value={form.timePerQuestion} onChange={(e) => set('timePerQuestion', e.target.value)}>
+                <select value={form.timePerQuestion} onChange={(e) => updateForm('timePerQuestion', e.target.value)}>
                   {timeOptions.map((t) => <option key={t}>{t}</option>)}
                 </select>
               </label>
             </div>
           </section>
 
-          {/* Upload panel */}
           <section className="iresume-panel">
-            <h2>Paste your resume</h2>
+            <h2>Your resume</h2>
 
             <textarea
               className="iresume-textarea"
               value={resumeText}
-              onChange={(e) => setResumeText(e.target.value)}
-              placeholder="Paste your resume content here (skills, experience, projects, etc.)..."
+              onChange={(e) => {
+                setResumeText(e.target.value)
+                setGapsAnalyzed(false)
+                setGaps([])
+              }}
+              placeholder="Paste your resume text here..."
               rows={15}
               style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #ddd', fontFamily: 'monospace' }}
             />
             <div className="iresume-wordcount">{resumeText.trim().split(/\s+/).filter(w => w).length} words</div>
 
-            {error ? <p className="inline-error">{error}</p> : null}
+            <button
+              type="button"
+              className="button button--secondary full-width-cta"
+              onClick={analyzeResume}
+              disabled={loadingGaps || resumeText.trim().length < 50}
+              style={{ marginTop: '10px' }}
+            >
+              {loadingGaps ? 'Analyzing...' : '🔍 Analyze resume'}
+            </button>
+
+            {gapsAnalyzed && gaps.length > 0 && (
+              <div className="rgap-wrap">
+                <div className="rgap-title">Resume gaps found</div>
+                <div className="rgap-legend">
+                  <span>🔴 Missing</span>
+                  <span>🟡 Weak</span>
+                  <span>💡 Suggestion</span>
+                </div>
+                <ul className="rgap-list">
+                  {gaps.map((g, i) => (
+                    <li key={i} className={`rgap-item rgap-item--${g.type}`}>
+                      <span className="rgap-icon">{gapIcon(g.type)}</span>
+                      <span className="rgap-text">{g.text}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {gapsAnalyzed && gaps.length === 0 && (
+              <div className="rgap-wrap rgap-wrap--good">
+                ✅ Resume looks solid for this role. No major gaps found.
+              </div>
+            )}
+
+            {error ? <p className="inline-error" style={{ marginTop: '10px' }}>{error}</p> : null}
 
             <button
               type="button"
               className="button button--primary full-width-cta"
               onClick={handleStart}
               disabled={loading}
+              style={{ marginTop: '12px' }}
             >
-              {loading ? 'Generating questions...' : 'Start Interview'}
+              {loading ? 'Getting questions ready...' : 'Start interview'}
             </button>
           </section>
         </div>

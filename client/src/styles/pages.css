@@ -2749,3 +2749,307 @@ details[open] .notion-chevron {
   font-weight: 700;
   letter-spacing: 0.04em;
 }
+/* ── Interview summary — new clean styles ── */
+.notion-block__score-badge {
+  font-size: 12px;
+  font-weight: 700;
+  padding: 2px 9px;
+  border-radius: 20px;
+  margin-left: 8px;
+}
+.notion-block__score-badge--green { background: #dcfce7; color: #15803d; }
+.notion-block__score-badge--amber { background: #fef9c3; color: #92400e; }
+.notion-block__score-badge--red   { background: #fee2e2; color: #991b1b; }
+
+.notion-block__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.notion-tag {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 20px;
+  line-height: 1.4;
+}
+.notion-tag--green  { background: #dcfce7; color: #15803d; }
+.notion-tag--orange { background: #ffedd5; color: #9a3412; }
+
+.notion-block__better-wrap {
+  margin-top: 12px;
+  border-top: 1px solid var(--borderLight);
+  padding-top: 10px;
+}
+
+.notion-block__toggle {
+  background: none;
+  border: none;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--textMedium);
+  cursor: pointer;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.notion-block__toggle:hover { color: var(--blueMain); }
+
+.notion-block__better-text {
+  margin: 10px 0 0;
+  font-size: 0.85rem;
+  line-height: 1.65;
+  color: var(--textMedium);
+  border-left: 3px solid var(--borderMedium);
+  padding-left: 12px;
+}
+
+/* ── Study plan ── */
+.splan-wrap {
+  margin-top: 32px;
+}
+
+.splan-loading {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 20px;
+  color: var(--textLight);
+  font-size: 0.875rem;
+}
+
+.splan-loading p {
+  margin: 0;
+}
+
+.splan-loading__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--blueMain);
+  animation: dotBounce 1.2s ease-in-out infinite;
+}
+.splan-loading__dot:nth-child(2) { animation-delay: 0.2s; }
+.splan-loading__dot:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes dotBounce {
+  0%, 100% { opacity: 0.3; transform: scale(0.8); }
+  50% { opacity: 1; transform: scale(1.1); }
+}
+
+.splan-empty {
+  padding: 20px;
+  border-radius: 10px;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  color: #15803d;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.splan-days {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.splan-card {
+  border: 1px solid var(--borderLight);
+  border-radius: 12px;
+  padding: 18px 20px;
+  background: #fff;
+  box-shadow: 0 1px 3px var(--shadowLight);
+}
+
+.splan-card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.splan-card__day {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--blueMain);
+  background: var(--blueAlpha);
+  padding: 3px 10px;
+  border-radius: 20px;
+}
+
+.splan-card__duration {
+  font-size: 0.75rem;
+  color: var(--textLight);
+  font-weight: 600;
+}
+
+.splan-card__topic {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--textBlack);
+  margin-bottom: 6px;
+  letter-spacing: -0.01em;
+}
+
+.splan-card__why {
+  font-size: 0.8rem;
+  color: #92400e;
+  background: #fef9c3;
+  border-radius: 6px;
+  padding: 6px 10px;
+  margin: 0 0 14px;
+  line-height: 1.5;
+}
+
+.splan-card__section {
+  margin-top: 14px;
+}
+
+.splan-card__label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--textLight);
+  margin-bottom: 8px;
+}
+
+.splan-card__links {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.splan-link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--borderLight);
+  background: var(--bgLight);
+  text-decoration: none;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.splan-link:hover {
+  border-color: var(--blueMain);
+  background: #eff6ff;
+}
+
+.splan-link--practice {
+  border-color: var(--borderMedium);
+  background: #fff;
+}
+
+.splan-link__icon {
+  font-size: 1rem;
+  flex-shrink: 0;
+}
+
+.splan-link__label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--textDark);
+  flex: 1;
+}
+
+.splan-link__arrow {
+  font-size: 0.8rem;
+  color: var(--textLight);
+  flex-shrink: 0;
+}
+
+.splan-link:hover .splan-link__label { color: var(--blueMain); }
+.splan-link:hover .splan-link__arrow { color: var(--blueMain); }
+
+.notion-block__better-line {
+  margin: 4px 0;
+  font-size: 0.85rem;
+  line-height: 1.6;
+  color: var(--textMedium);
+}
+
+/* ── Resume gap detector ── */
+.rgap-wrap {
+  margin-top: 14px;
+  border: 1px solid var(--borderLight);
+  border-radius: 10px;
+  padding: 14px 16px;
+  background: #fff;
+}
+
+.rgap-wrap--good {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+  color: #15803d;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.rgap-title {
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--textLight);
+  margin-bottom: 8px;
+}
+
+.rgap-legend {
+  display: flex;
+  gap: 12px;
+  font-size: 0.75rem;
+  color: var(--textLight);
+  margin-bottom: 10px;
+}
+
+.rgap-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.rgap-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
+.rgap-item--missing {
+  background: #fff1f2;
+  border: 1px solid #fecdd3;
+}
+
+.rgap-item--weak {
+  background: #fefce8;
+  border: 1px solid #fef08a;
+}
+
+.rgap-item--suggestion {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+}
+
+.rgap-icon {
+  flex-shrink: 0;
+  font-size: 0.9rem;
+  margin-top: 1px;
+}
+
+.rgap-text {
+  color: var(--textDark);
+  font-weight: 500;
+}

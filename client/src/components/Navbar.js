@@ -1,13 +1,13 @@
-import React, { useContext } from 'react';
-import { Link, useLocation } from 'react-router-dom';
-import { AuthContext } from '../context/AuthContext';
+import React, { useContext } from 'react'
+import { Link, useLocation } from 'react-router-dom'
+import { AuthContext } from '../context/AuthContext'
 
 const navItems = [
   { label: 'Home', path: '/' },
   { label: 'Quiz', path: '/quiz' },
   { label: 'Interview', path: '/interview' },
-  { label: 'Report', path: '/dashboard' },
-];
+  { label: 'Dashboard', path: '/dashboard' },
+]
 
 const SparkIcon = () => (
   <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -16,32 +16,32 @@ const SparkIcon = () => (
       fill="currentColor"
     />
   </svg>
-);
+)
 
 const Navbar = () => {
-  const location = useLocation();
-  const { user, isAuthenticated, logout } = useContext(AuthContext);
+  const location = useLocation()
+  const { user, isAuthenticated, logout } = useContext(AuthContext)
 
   return (
     <header className="topbar-shell">
       <nav className="topbar">
-        <Link to="/" className="brand" aria-label="AI Quiz Pro home">
+        <Link to="/" className="brand" aria-label="PrepFlow home">
           <span className="brand__mark">
             <SparkIcon />
           </span>
           <span className="brand__copy">
             <strong>PrepFlow</strong>
-            <span>Learning Hub</span>
+            <span>Practice app</span>
           </span>
         </Link>
 
         <div className="topbar__center">
           {navItems.map((item) => {
-            const isInterviewRoute = item.path === '/interview' && location.pathname.startsWith('/interview');
+            const isInterviewRoute = item.path === '/interview' && location.pathname.startsWith('/interview')
             const isActive =
               isInterviewRoute ||
               (item.path !== '/' && item.path !== '/interview' && location.pathname === item.path) ||
-              (item.path === '/' && location.pathname === '/' && item.label === 'Home');
+              (item.path === '/' && location.pathname === '/' && item.label === 'Home')
 
             return (
               <Link
@@ -63,14 +63,14 @@ const Navbar = () => {
             </>
           ) : (
             <>
-              <Link to="/login" className="topbar__login">Login</Link>
-              <Link to="/login" className="topbar__cta">Start free</Link>
+              <Link to="/login" className="topbar__login">Log in</Link>
+              <Link to="/login" className="topbar__cta">Get started</Link>
             </>
           )}
         </div>
       </nav>
     </header>
-  );
-};
+  )
+}
 
-export default Navbar;
+export default Navbar

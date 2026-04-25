@@ -1,7 +1,7 @@
-import React, { createContext, useEffect, useState } from 'react';
-import api, { AUTH_STORAGE_KEY, loadStoredAuth, setAuthToken } from '../services/api';
+import React, { createContext, useEffect, useState } from 'react'
+import api, { AUTH_STORAGE_KEY, loadStoredAuth, setAuthToken } from '../services/api'
 
-export const AuthContext = createContext();
+export const AuthContext = createContext()
 
 export const AuthProvider = ({ children }) => {
   const [authState, setAuthState] = useState(() => loadStoredAuth() || { user: null, token: null });
@@ -42,7 +42,7 @@ export const AuthProvider = ({ children }) => {
     return () => {
       isMounted = false;
     };
-  }, []); // empty array — runs once on mount only
+  }, [])
 
   const persistAuth = (payload) => {
     setAuthToken(payload?.token || null);

@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useMemo, useState } from 'react'
+import React, { useContext, useEffect, useState } from 'react'
 import Navbar from '../components/Navbar'
 import QuestionCard from '../components/QuestionCard'
 import ProgressBar from '../components/ProgressBar'
@@ -15,12 +15,12 @@ const difficultyLevels = [
 
 const questionCounts = [3, 5, 10, 15]
 
-const loadSteps = ['Shuffle topics', 'Write questions', 'Double-check', 'Ready']
+const loadingSteps = ['Shuffle topics', 'Write questions', 'Double-check', 'Ready']
 
 const SetupView = ({ form, setForm, onStart }) => (
   <main className="quiz-page quiz-page--duo">
     <section className="quiz-setup-card quiz-setup-card--duo">
-      <h1 className="quiz-setup-card__title">Daily-style quiz</h1>
+      <h1 className="quiz-setup-card__title">Quiz practice</h1>
 
       <label className="form-group">
         <span>Your Name</span>
@@ -72,7 +72,7 @@ const SetupView = ({ form, setForm, onStart }) => (
       </div>
 
       <button type="button" className="duo-start-btn" onClick={onStart}>
-        Let's go
+        Start quiz
       </button>
     </section>
   </main>
@@ -82,10 +82,10 @@ const LoadingView = ({ activeStep }) => (
   <main className="quiz-loading-page quiz-loading-page--duo">
     <section className="quiz-loading-card quiz-loading-card--duo">
       <div className="spinner-ring spinner-ring--duo" />
-      <h2>Hang tight</h2>
+      <h2>Getting your quiz ready</h2>
 
       <div className="loading-checklist loading-checklist--duo">
-        {loadSteps.map((step, index) => {
+        {loadingSteps.map((step, index) => {
           const completed = index < activeStep
           const current = index === activeStep
 
@@ -115,7 +115,7 @@ const ResultsView = ({ answers, score, onRestart, config }) => (
       <div className="duo-result-hero" aria-hidden="true">
         <span>{score === answers.length ? '🎉' : score >= answers.length / 2 ? '👍' : '📝'}</span>
       </div>
-      <p className="quiz-results-card__label">Lesson done</p>
+      <p className="quiz-results-card__label">Quiz complete</p>
       <h1>
         {score} / {answers.length} correct
       </h1>
@@ -140,7 +140,10 @@ const ResultsView = ({ answers, score, onRestart, config }) => (
 
       <div className="results-list results-list--duo">
         {answers.map((answer, index) => (
-          <article key={answer.questionId} className={'result-item' + (answer.isCorrect ? ' is-correct' : ' is-wrong')}>
+          <article
+            key={answer.questionId}
+            className={'result-item' + (answer.isCorrect ? ' is-correct' : ' is-wrong')}
+          >
             <strong>
               Q{index + 1}. {answer.question}
             </strong>
@@ -172,15 +175,16 @@ const Quiz = () => {
     startQuiz,
     chooseOption,
     submitAnswer,
+    previousQuestion,
     resetQuiz,
-    endEarly
+    endEarly,
   } = useQuiz()
 
   const [form, setForm] = useState({
     userName: user?.name || 'Learner',
     topic: '',
     difficulty: 'medium',
-    questionCount: 5
+    questionCount: 5,
   })
   const [loadingStep, setLoadingStep] = useState(0)
   const [resultSaved, setResultSaved] = useState(false)
@@ -205,7 +209,7 @@ const Quiz = () => {
         const response = await api.post('/ai/generate-quiz-questions', {
           topic: form.topic || 'Computer Science',
           difficulty: form.difficulty,
-          questionCount: form.questionCount
+          questionCount: form.questionCount,
         })
 
         if (isMounted) {
@@ -220,7 +224,7 @@ const Quiz = () => {
       }
     }
 
-    const timers = loadSteps.map((_, index) =>
+    const timers = loadingSteps.map((_, index) =>
       window.setTimeout(() => {
         if (isMounted) setLoadingStep(index)
       }, index * 700)
@@ -228,7 +232,7 @@ const Quiz = () => {
 
     const startTimer = window.setTimeout(() => {
       generateQuestions()
-    }, loadSteps.length * 700 + 250)
+    }, loadingSteps.length * 700 + 250)
 
     return () => {
       isMounted = false
@@ -272,7 +276,7 @@ const Quiz = () => {
           difficulty: quizConfig.difficulty || form.difficulty,
           modeName: 'AI Quiz',
           totalQuestions: questions.length,
-          correctAnswers: score
+          correctAnswers: score,
         })
 
         if (isMounted) {
@@ -301,21 +305,13 @@ const Quiz = () => {
     status
   ])
 
-  const quizHeaderMeta = useMemo(
-    () => ({
-      topic: (quizConfig.topic || form.topic || 'General').toUpperCase(),
-      difficulty: (quizConfig.difficulty || form.difficulty).toUpperCase()
-    }),
-    [form.difficulty, form.topic, quizConfig.difficulty, quizConfig.topic]
-  )
-
   const handleStart = () => {
     setResultSaved(false)
     beginGeneration({
       userName: user?.name || form.userName || 'Learner',
       topic: form.topic.trim() || 'DSA',
       difficulty: form.difficulty,
-      questionCount: form.questionCount
+      questionCount: form.questionCount,
     })
   }
 
@@ -356,6 +352,7 @@ const Quiz = () => {
             selectedOption={selectedOption}
             onSelect={chooseOption}
             onConfirm={handleConfirm}
+            onPrevious={previousQuestion}
             currentIndex={currentIndex}
             totalQuestions={questions.length}
           />

@@ -1,7 +1,7 @@
-import React, { useContext, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { AuthContext } from '../context/AuthContext';
-import api from '../services/api';
+import React, { useContext, useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
+import { AuthContext } from '../context/AuthContext'
+import api from '../services/api'
 
 const roles = ['Software Engineer', 'Frontend Engineer', 'Backend Engineer', 'Data Analyst', 'Full Stack Engineer']
 const difficulties = ['Easy (Junior)', 'Hard (Senior Level)']
@@ -12,7 +12,7 @@ const companies = ['None', 'Google', 'Amazon', 'Meta', 'Startup']
 
 const DocumentInterview = () => {
   const { user } = useContext(AuthContext);
-  const navigate = useNavigate();
+  const navigate = useNavigate()
   const [form, setForm] = useState({
     role: 'Software Engineer',
     difficulty: 'Easy (Junior)',
@@ -20,25 +20,25 @@ const DocumentInterview = () => {
     timePerQuestion: '2 minutes',
     personality: 'Standard',
     company: 'None',
-  });
-  const [documentText, setDocumentText] = useState('');
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
+  })
+  const [documentText, setDocumentText] = useState('')
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
 
   const userName = user?.name || 'Learner'
   const questionCount = Number(form.questions.split(' ')[0])
   const timePerQuestionSeconds = Number(form.timePerQuestion.split(' ')[0]) * 60
 
-  const set = (key, val) => setForm((f) => ({ ...f, [key]: val }));
+  const updateForm = (key, val) => setForm((f) => ({ ...f, [key]: val }))
 
   const handleStart = async () => {
     if (!documentText || documentText.trim().length < 50) {
-      setError('Please paste your document content first (at least 50 characters).');
-      return;
+      setError('Need at least 50 characters of text to start.')
+      return
     }
 
-    setLoading(true);
-    setError('');
+    setLoading(true)
+    setError('')
 
     try {
       const response = await api.post('/ai/generate-document-questions', {
@@ -48,9 +48,9 @@ const DocumentInterview = () => {
         questionCount,
         personality: form.personality.toLowerCase(),
         company: form.company.toLowerCase(),
-      });
+      })
 
-      const questions = response.data.questions;
+      const questions = response.data.questions
 
       navigate('/interview/session', {
         state: {
@@ -63,14 +63,14 @@ const DocumentInterview = () => {
           timePerQuestionSeconds,
           questions,
         },
-      });
+      })
     } catch (error) {
-      console.error('Error:', error);
-      setError('Failed to generate questions. Please try again.');
+      console.error('Error:', error)
+      setError('Failed to generate questions. Please try again.')
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
   return (
     <div className="interview-shell">
@@ -82,21 +82,20 @@ const DocumentInterview = () => {
         </div>
 
         <div className="iresume-layout">
-          {/* Setup panel */}
           <section className="iresume-panel">
-            <h2>Session setup</h2>
+            <h2>Settings</h2>
 
             <div className="iresume-user-row">
               <div className="iresume-user-avatar">{userName[0]?.toUpperCase()}</div>
               <div>
                 <strong>{userName}</strong>
-                <small>Active candidate</small>
+                <small>Signed in</small>
               </div>
             </div>
 
             <label className="form-group">
-              <span>Target role</span>
-              <select value={form.role} onChange={(e) => set('role', e.target.value)}>
+              <span>Role</span>
+              <select value={form.role} onChange={(e) => updateForm('role', e.target.value)}>
                 {roles.map((r) => <option key={r}>{r}</option>)}
               </select>
             </label>
@@ -108,7 +107,7 @@ const DocumentInterview = () => {
                   <div
                     key={d}
                     className={`difficulty-card ${form.difficulty === d ? 'difficulty-card--active' : ''}`}
-                    onClick={() => set('difficulty', d)}
+                    onClick={() => updateForm('difficulty', d)}
                   >
                     {d}
                   </div>
@@ -117,13 +116,13 @@ const DocumentInterview = () => {
             </label>
 
             <label className="form-group">
-              <span>Interviewer style</span>
+              <span>Interviewer</span>
               <div className="style-cards">
                 {personalities.map((p) => (
                   <div
                     key={p}
                     className={`style-card ${form.personality === p ? 'style-card--active' : ''}`}
-                    onClick={() => set('personality', p)}
+                    onClick={() => updateForm('personality', p)}
                   >
                     {p}
                   </div>
@@ -132,8 +131,8 @@ const DocumentInterview = () => {
             </label>
 
             <label className="form-group">
-              <span>Company style</span>
-              <select value={form.company} onChange={(e) => set('company', e.target.value)}>
+              <span>Company</span>
+              <select value={form.company} onChange={(e) => updateForm('company', e.target.value)}>
                 {companies.map((c) => <option key={c}>{c}</option>)}
               </select>
             </label>
@@ -141,29 +140,28 @@ const DocumentInterview = () => {
             <div className="ihub-row">
               <label className="form-group">
                 <span>Questions</span>
-                <select value={form.questions} onChange={(e) => set('questions', e.target.value)}>
+                <select value={form.questions} onChange={(e) => updateForm('questions', e.target.value)}>
                   {questionOptions.map((q) => <option key={q}>{q}</option>)}
                 </select>
               </label>
 
               <label className="form-group">
                 <span>Time / Q</span>
-                <select value={form.timePerQuestion} onChange={(e) => set('timePerQuestion', e.target.value)}>
+                <select value={form.timePerQuestion} onChange={(e) => updateForm('timePerQuestion', e.target.value)}>
                   {timeOptions.map((t) => <option key={t}>{t}</option>)}
                 </select>
               </label>
             </div>
           </section>
 
-          {/* Upload panel */}
           <section className="iresume-panel">
-            <h2>Paste your document</h2>
+            <h2>Your document</h2>
 
             <textarea
               className="iresume-textarea"
               value={documentText}
               onChange={(e) => setDocumentText(e.target.value)}
-              placeholder="Paste your study material, notes, or Q&A content here..."
+              placeholder="Paste your document text here..."
               rows={15}
               style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #ddd', fontFamily: 'monospace' }}
             />
@@ -177,13 +175,13 @@ const DocumentInterview = () => {
               onClick={handleStart}
               disabled={loading}
             >
-              {loading ? 'Generating questions...' : 'Start Interview'}
+              {loading ? 'Getting questions ready...' : 'Start interview'}
             </button>
           </section>
         </div>
       </main>
     </div>
-  );
-};
+  )
+}
 
-export default DocumentInterview;
+export default DocumentInterview

@@ -19,7 +19,6 @@ const scoreAnswer = (answer, prompt, topic) => {
   const trimmed = answer.trim()
   const keywords = [...new Set([...getKeywords(prompt).slice(0, 6), ...getKeywords(topic).slice(0, 4)])]
   const matched = keywords.filter((k) => trimmed.toLowerCase().includes(k))
-  const missing = keywords.filter((k) => !trimmed.toLowerCase().includes(k))
   const words = trimmed.split(/\s+/).filter(Boolean).length
 
   const relevance = trimmed ? Math.min(10, 2 + matched.length * 2) : 0
@@ -27,14 +26,12 @@ const scoreAnswer = (answer, prompt, topic) => {
   const communication = trimmed
     ? Math.min(10, 2 + (trimmed.includes('.') ? 2 : 0) + (words > 25 ? 3 : 1) + (trimmed.length > 140 ? 2 : 0))
     : 0
-  const semantic = trimmed ? Math.min(10, Math.round((matched.length / Math.max(keywords.length, 1)) * 10)) : 0
-  const topicCoverage = trimmed ? Math.round((matched.length / Math.max(keywords.length, 1)) * 100) : 0
   const overall = Math.round((relevance + depth + communication) / 3)
 
-  return { overall, relevance, depth, communication, semantic, topicCoverage, matched, missing }
+  return { overall, relevance, depth, communication }
 }
 
-const pickVoice = () => {
+const getVoice = () => {
   const voices = window.speechSynthesis.getVoices()
   const femaleNames = [
     'Microsoft Jenny Online (Natural)',
@@ -51,28 +48,42 @@ const pickVoice = () => {
   return voices.find((v) => v.lang.startsWith('en')) || voices[0] || null
 }
 
-const speak = (text, muted) => {
-  if (muted || !text) return
+const speak = (text, soundOff) => {
+  if (soundOff || !text) return
   window.speechSynthesis.cancel()
   const utterance = new SpeechSynthesisUtterance(text)
   utterance.rate = 0.92
   utterance.pitch = 1.0
-  const voice = pickVoice()
+  const voice = getVoice()
   if (voice) utterance.voice = voice
   setTimeout(() => window.speechSynthesis.speak(utterance), 120)
 }
 
-const ScorePill = ({ label, value }) => {
-  const color = value >= 7 ? 'green' : value >= 4 ? 'amber' : 'red'
-  return (
-    <div className={`iscore-pill iscore-pill--${color}`}>
-      <span>{label}</span>
-      <strong>{value}/10</strong>
-    </div>
-  )
+const clock = (sec) => `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`
+
+const getResourceIcon = (type) => {
+  if (type === 'video') return '🎬'
+  if (type === 'article') return '📝'
+  return '📄'
 }
 
-const clock = (sec) => `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`
+const getBetterAnswerPoints = (text) => {
+  if (!text || typeof text !== 'string') return []
+
+  const clean = text
+    .replace(/\r/g, '\n')
+    .replace(/\n+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+
+  if (!clean) return []
+
+  return clean
+    .replace(/\s+\d+\.\s+/g, '. ')
+    .split(/(?<=[.!?])\s+/)
+    .map((line) => line.replace(/^\d+\.\s*/, '').replace(/^[-*]\s*/, '').trim())
+    .filter(Boolean)
+}
 
 const InterviewSession = () => {
   const location = useLocation()
@@ -90,13 +101,20 @@ const InterviewSession = () => {
   const [camReady, setCamReady] = useState(false)
   const [micSupported] = useState(Boolean(speechRecognition))
   const [recording, setRecording] = useState(false)
-  const [muted, setMuted] = useState(false)
+  const [soundOff, setSoundOff] = useState(false)
   const [hint, setHint] = useState('')
   const [feedback, setFeedback] = useState(null)
   const [submitted, setSubmitted] = useState(false)
   const [saved, setSaved] = useState(false)
   const [voicesReady, setVoicesReady] = useState(false)
   const [loadingFollowUp, setLoadingFollowUp] = useState(false)
+  const [studyPlan, setStudyPlan] = useState(null)
+  const [loadingStudyPlan, setLoadingStudyPlan] = useState(false)
+  const [openBetterAnswer, setOpenBetterAnswer] = useState({})
+
+  const toggleBetterAnswer = (qid) => {
+    setOpenBetterAnswer((prev) => ({ ...prev, [qid]: !prev[qid] }))
+  }
 
   const question = session?.questions?.[currentQuestionIndex] || null
   const progress = session?.questions?.length ? ((currentQuestionIndex + 1) / session.questions.length) * 100 : 0
@@ -113,7 +131,10 @@ const InterviewSession = () => {
   }, [])
 
   useEffect(() => {
-    if (!session || status !== 'active' || !navigator.mediaDevices?.getUserMedia) return
+    if (!session || status !== 'active' || !navigator.mediaDevices?.getUserMedia) {
+      return
+    }
+
     let stream
     navigator.mediaDevices.getUserMedia({ video: true, audio: true })
       .then((s) => {
@@ -126,7 +147,10 @@ const InterviewSession = () => {
   }, [session, status])
 
   useEffect(() => {
-    if (!speechRecognition) return
+    if (!speechRecognition) {
+      return
+    }
+
     const recognizer = new speechRecognition()
     recognizer.lang = 'en-US'
     recognizer.continuous = true
@@ -136,23 +160,36 @@ const InterviewSession = () => {
       setAnswerDraft(text)
     }
     recognizer.onend = () => setRecording(false)
-    recognizer.onerror = () => { setRecording(false); setHint('Voice not available in this browser.') }
+    recognizer.onerror = () => {
+      setRecording(false)
+      setHint('Voice not available in this browser.')
+    }
     speechRef.current = recognizer
     return () => recognizer.stop()
   }, [])
 
   useEffect(() => {
-    if (status !== 'active' || submitted) return
-    if (timeLeft <= 0) { handleSubmit(); return }
+    if (status !== 'active' || submitted) {
+      return
+    }
+
+    if (timeLeft <= 0) {
+      handleSubmit()
+      return
+    }
+
     const t = window.setTimeout(() => setTimeLeft((v) => v - 1), 1000)
     return () => clearTimeout(t)
   }, [submitted, status, timeLeft])
 
   useEffect(() => {
-    if (!question || !voicesReady || !camReady) return
-    speak(question.prompt, muted)
+    if (!question || !voicesReady || !camReady) {
+      return
+    }
+
+    speak(question.prompt, soundOff)
     return () => window.speechSynthesis.cancel()
-  }, [question, muted, voicesReady, camReady])
+  }, [question, soundOff, voicesReady, camReady])
 
   useEffect(() => {
     const el = threadRef.current
@@ -196,7 +233,33 @@ const InterviewSession = () => {
     return () => { isMounted = false }
   }, [status, saved, session, responses.length, summaryMetrics.overall])
 
+  useEffect(() => {
+    if (status === 'complete' && responses.length > 0 && !studyPlan && !loadingStudyPlan) {
+      fetchStudyPlan()
+    }
+  }, [status, responses.length])
+
   if (!session?.questions?.length) return <Navigate to="/interview" replace />
+
+  const fetchStudyPlan = async () => {
+    setLoadingStudyPlan(true)
+    try {
+      const sessionData = {
+        topic: session.summaryTopic || session.metaLabel,
+        responses: responses.map(r => ({
+          question: r.prompt,
+          answer: r.answer,
+          score: r.metrics.overall
+        }))
+      }
+      const res = await api.post('/ai/generate-study-plan', { sessionData })
+      setStudyPlan(res.data)
+    } catch (err) {
+      console.error('Failed to generate study plan:', err)
+    } finally {
+      setLoadingStudyPlan(false)
+    }
+  }
 
   const startRecording = () => {
     if (!speechRef.current) { setHint('Speech-to-text not supported here.'); return }
@@ -249,10 +312,7 @@ const InterviewSession = () => {
 
       if (currentQuestionIndex + 1 < session.questions.length) {
         try {
-          const history = responses.map((r) => ({
-            question: r.prompt,
-            answer: r.answer
-          }))
+          const history = responses.map((r) => ({ question: r.prompt, answer: r.answer }))
           history.push({ question: question.prompt, answer: answerDraft })
 
           const followUpResponse = await api.post('/ai/follow-up', {
@@ -273,13 +333,13 @@ const InterviewSession = () => {
               return { ...prev, questions: newQuestions }
             })
           }
-        } catch (error) {
-          console.error('Follow-up generation failed:', error)
+        } catch (err) {
+          console.error('Follow-up generation failed:', err)
         }
       }
 
-    } catch (error) {
-      console.error('Evaluation error:', error)
+    } catch (err) {
+      console.error('Evaluation error:', err)
       setHint('Failed to evaluate answer. Using fallback scoring.')
 
       const metrics = scoreAnswer(answerDraft, question.prompt, session.summaryTopic || session.metaLabel)
@@ -347,8 +407,8 @@ const InterviewSession = () => {
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg>
                   Replay
                 </button>
-                <button type="button" className="interview-chat-chip" onClick={() => setMuted((v) => !v)}>
-                  {muted ? (
+                <button type="button" className="interview-chat-chip" onClick={() => setSoundOff((v) => !v)}>
+                  {soundOff ? (
                     <>
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 5L6 9H2v6h4l5 4V5z"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>
                       Muted
@@ -505,37 +565,129 @@ const InterviewSession = () => {
 
             <h2 className="interview-summary-notion__h2">Per question</h2>
             <div className="notion-stack">
-              {responses.map((r, questionNumber) => (
-                <article key={r.questionId} className="notion-block">
-                  <div className="notion-block__title">Q{questionNumber + 1} · Score {r.metrics.overall * 10}/100</div>
-                  <p className="notion-block__q">{r.prompt}</p>
-                  <p className="notion-block__a">
-                    <em>Your answer:</em> {r.answer.trim() || 'No answer recorded.'}
-                  </p>
-                  {r.metrics.feedback && (
-                    <p className="notion-block__feedback">
-                      <strong>Feedback:</strong> {r.metrics.feedback}
-                    </p>
-                  )}
-                  {r.metrics.betterAnswer && (
-                    <p className="notion-block__better">
-                      <strong>Better answer:</strong> {r.metrics.betterAnswer}
-                    </p>
-                  )}
-                  {r.metrics.strengths && r.metrics.strengths.length > 0 && (
-                    <div className="notion-block__list">
-                      <strong>Strengths:</strong>
-                      <ul>{r.metrics.strengths.map((s, i) => <li key={i}>{s}</li>)}</ul>
+              {responses.map((r, questionNumber) => {
+                const betterAnswerPoints = getBetterAnswerPoints(r.metrics.betterAnswer)
+
+                return (
+                  <article key={r.questionId} className="notion-block">
+                    <div className="notion-block__title">
+                      Q{questionNumber + 1}
+                      <span className={`notion-block__score-badge ${r.metrics.overall >= 7 ? 'notion-block__score-badge--green' : r.metrics.overall >= 4 ? 'notion-block__score-badge--amber' : 'notion-block__score-badge--red'}`}>
+                        {r.metrics.overall * 10}/100
+                      </span>
                     </div>
-                  )}
-                  {r.metrics.improvements && r.metrics.improvements.length > 0 && (
-                    <div className="notion-block__list">
-                      <strong>Improvements:</strong>
-                      <ul>{r.metrics.improvements.map((imp, i) => <li key={i}>{imp}</li>)}</ul>
+
+                    <p className="notion-block__q">{r.prompt}</p>
+
+                    <p className="notion-block__a">
+                      <em>Your answer:</em> {r.answer.trim() || 'No answer recorded.'}
+                    </p>
+
+                    {r.metrics.feedback && (
+                      <p className="notion-block__feedback">{r.metrics.feedback}</p>
+                    )}
+
+                    {r.metrics.strengths && r.metrics.strengths.length > 0 && (
+                      <div className="notion-block__tags">
+                        {r.metrics.strengths.map((s, i) => (
+                          <span key={i} className="notion-tag notion-tag--green">✓ {s}</span>
+                        ))}
+                      </div>
+                    )}
+
+                    {r.metrics.improvements && r.metrics.improvements.length > 0 && (
+                      <div className="notion-block__tags" style={{ marginTop: '6px' }}>
+                        {r.metrics.improvements.map((imp, i) => (
+                          <span key={i} className="notion-tag notion-tag--orange">↑ {imp}</span>
+                        ))}
+                      </div>
+                    )}
+
+                    {betterAnswerPoints.length > 0 && (
+                      <div className="notion-block__better-wrap">
+                        <button
+                          type="button"
+                          className="notion-block__toggle"
+                          onClick={() => toggleBetterAnswer(r.questionId)}
+                        >
+                          {openBetterAnswer[r.questionId] ? '▴ Hide better answer' : '▾ Show better answer'}
+                        </button>
+                        {openBetterAnswer[r.questionId] && (
+                          <div className="notion-block__better-text">
+                            <ul className="notion-block__better-list">
+                              {betterAnswerPoints.map((line, i) => (
+                                <li key={i} className="notion-block__better-item">{line}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </article>
+                )
+              })}
+            </div>
+
+            {/* study plan section */}
+            <div className="splan-wrap">
+              <h2 className="interview-summary-notion__h2">Your study plan</h2>
+
+              {loadingStudyPlan && (
+                <div className="splan-loading">
+                  <span className="splan-loading__dot" />
+                  <span className="splan-loading__dot" />
+                  <span className="splan-loading__dot" />
+                  <p>Building your plan based on your answers…</p>
+                </div>
+              )}
+
+              {!loadingStudyPlan && studyPlan && studyPlan.days && studyPlan.days.length === 0 && (
+                <div className="splan-empty">
+                  🎉 Great job — no major weak areas found. Keep practicing to stay sharp.
+                </div>
+              )}
+
+              {!loadingStudyPlan && studyPlan && studyPlan.days && studyPlan.days.length > 0 && (
+                <div className="splan-days">
+                  {studyPlan.days.map((day) => (
+                    <div key={day.day} className="splan-card">
+
+                      <div className="splan-card__head">
+                        <span className="splan-card__day">Day {day.day}</span>
+                        <span className="splan-card__duration">{day.duration}</span>
+                      </div>
+
+                      <div className="splan-card__topic">{day.topic}</div>
+
+                      {day.why && (
+                        <p className="splan-card__why">⚠ {day.why}</p>
+                      )}
+
+                      {day.resources && day.resources.length > 0 && (
+                        <div className="splan-card__section">
+                          <div className="splan-card__label">Resources</div>
+                          <div className="splan-card__links">
+                            {day.resources.map((r, i) => (
+                              <a
+                                key={i}
+                                href={r.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="splan-link"
+                              >
+                                <span className="splan-link__icon">{getResourceIcon(r.type)}</span>
+                                <span className="splan-link__label">{r.label}</span>
+                                <span className="splan-link__arrow">↗</span>
+                              </a>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
                     </div>
-                  )}
-                </article>
-              ))}
+                  ))}
+                </div>
+              )}
             </div>
 
             <div className="interview-summary-actions">

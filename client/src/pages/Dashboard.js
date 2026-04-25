@@ -1,59 +1,59 @@
-import React, { useContext, useEffect, useState } from 'react';
-import Navbar from '../components/Navbar';
-import { AuthContext } from '../context/AuthContext';
-import api from '../services/api';
+import React, { useContext, useEffect, useState } from 'react'
+import Navbar from '../components/Navbar'
+import { AuthContext } from '../context/AuthContext'
+import api from '../services/api'
 
 const Dashboard = () => {
-  const { user } = useContext(AuthContext);
+  const { user } = useContext(AuthContext)
   const [summary, setSummary] = useState({
     totalPoints: 0,
     rank: null,
-  });
-  const [leaderboard, setLeaderboard] = useState([]);
-  const [myLeaderboardEntry, setMyLeaderboardEntry] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState('');
+  })
+  const [leaderboard, setLeaderboard] = useState([])
+  const [myLeaderboardEntry, setMyLeaderboardEntry] = useState(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState('')
 
   useEffect(() => {
-    let isMounted = true;
+    let isMounted = true
 
     const loadDashboard = async () => {
       try {
-        setIsLoading(true);
+        setIsLoading(true)
         const [{ data: summaryData }, { data: leaderboardData }] = await Promise.all([
           api.get('/quiz/summary'),
           api.get('/quiz/leaderboard'),
-        ]);
+        ])
 
         if (!isMounted) {
-          return;
+          return
         }
 
-        setSummary(summaryData.summary);
-        setLeaderboard(leaderboardData.leaderboard || []);
-        setMyLeaderboardEntry(leaderboardData.myLeaderboardEntry || null);
-        setError('');
+        setSummary(summaryData.summary)
+        setLeaderboard(leaderboardData.leaderboard || [])
+        setMyLeaderboardEntry(leaderboardData.myLeaderboardEntry || null)
+        setError('')
       } catch (requestError) {
         if (isMounted) {
-          setError(requestError.response?.data?.message || 'Could not load this page. Try again in a bit.');
+          setError(requestError.response?.data?.message || 'Could not load the dashboard right now. Please try again.')
         }
       } finally {
         if (isMounted) {
-          setIsLoading(false);
+          setIsLoading(false)
         }
       }
-    };
+    }
 
-    loadDashboard();
+    loadDashboard()
 
     return () => {
-      isMounted = false;
-    };
-  }, []);
+      isMounted = false
+    }
+  }, [])
 
-  const topScorer = leaderboard.length ? leaderboard[0] : null;
-  const myScore = myLeaderboardEntry?.totalPoints ?? summary.totalPoints ?? 0;
-  const myRank = myLeaderboardEntry?.rank ?? summary.rank;
+  const topScorer = leaderboard.length ? leaderboard[0] : null
+  const myScore = myLeaderboardEntry?.totalPoints ?? summary.totalPoints ?? 0
+  const myRank = myLeaderboardEntry?.rank ?? summary.rank
 
   return (
     <div className="page-shell page-shell--notion">
@@ -61,7 +61,12 @@ const Dashboard = () => {
       <main className="notion-report">
         <header className="notion-report__header">
           <div className="notion-report__content">
-            <p className="notion-report__breadcrumb" style={{ fontWeight: 'bold', fontSize: '1.5rem', color: '#1a1a1a' }}>Dashboard</p>
+            <p
+              className="notion-report__breadcrumb"
+              style={{ fontWeight: 'bold', fontSize: '1.5rem', color: '#1a1a1a' }}
+            >
+              Dashboard
+            </p>
           </div>
         </header>
 
@@ -76,18 +81,18 @@ const Dashboard = () => {
 
         <section className="notion-properties">
           <h2 className="notion-report__h2">Properties</h2>
-          <table className="notion-props-table">
+          <table className="notion-props-table" style={{ background: '#f8f9fa', borderRadius: '8px' }}>
             <tbody>
               <tr>
-                <th scope="row">Account</th>
+                <th scope="row">👤 Account</th>
                 <td>{user?.email || '—'}</td>
               </tr>
-              <tr>
-                <th scope="row">Your rank</th>
+              <tr style={{ background: '#fff' }}>
+                <th scope="row">🏅 Your rank</th>
                 <td>{myRank ? `#${myRank}` : 'Not ranked yet'}</td>
               </tr>
               <tr>
-                <th scope="row">Points</th>
+                <th scope="row">⭐ Points</th>
                 <td>
                   <strong className="notion-props-table__strong">{myScore}</strong>
                 </td>
@@ -98,7 +103,6 @@ const Dashboard = () => {
 
         <section className="notion-toggle-block">
           <h2 className="notion-report__h2">Leaderboard snapshot</h2>
-          <p className="notion-report__muted">We only show the #1 spot here plus your row — keeps the page short.</p>
 
           <details className="notion-details" open>
             <summary className="notion-details__summary">
@@ -122,13 +126,13 @@ const Dashboard = () => {
                   <tbody>
                     <tr>
                       <td>{topScorer.rank}</td>
-                      <td>{topScorer.isCurrentUser ? `${topScorer.name} (you)` : topScorer.name}</td>
+                      <td>{topScorer.isCurrentUser ? `${topScorer.user?.name || topScorer.name} (you)` : topScorer.user?.name || topScorer.name}</td>
                       <td>{topScorer.totalPoints}</td>
                     </tr>
                   </tbody>
                 </table>
               ) : (
-                <p className="notion-report__muted">No one on the board yet. Run a quiz or interview first.</p>
+                <p className="notion-report__muted">No scores yet. Complete a quiz or interview to appear here.</p>
               )}
             </div>
           </details>
@@ -166,7 +170,7 @@ const Dashboard = () => {
         </section>
       </main>
     </div>
-  );
-};
+  )
+}
 
-export default Dashboard;
+export default Dashboard

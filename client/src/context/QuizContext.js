@@ -58,24 +58,48 @@ export const QuizProvider = ({ children }) => {
     setSelectedOption(option);
   };
 
+  const findSavedAnswer = (questionId) => answers.find((item) => item.questionId === questionId) || null;
+  const getOptionCode = (option) => {
+    if (!option || typeof option !== 'string') {
+      return '';
+    }
+
+    const match = option.match(/^([A-Z])\s*:/i);
+    return match ? match[1].toUpperCase() : option.trim().toUpperCase();
+  };
+
+  const findCorrectOptionText = (question) => {
+    if (!question?.options?.length) {
+      return question?.correctAnswer || '';
+    }
+
+    const code = getOptionCode(question.correctAnswer);
+    return question.options.find((option) => getOptionCode(option) === code) || question.correctAnswer;
+  };
+
   const submitAnswer = () => {
     if (!currentQuestion) {
       return false;
     }
 
     const finalOption = selectedOption || '';
-    const isCorrect = finalOption === currentQuestion.correctAnswer;
+    const finalOptionCode = getOptionCode(finalOption);
+    const correctOptionCode = getOptionCode(currentQuestion.correctAnswer);
+    const isCorrect = finalOptionCode === correctOptionCode;
     const nextAnswer = {
       questionId: currentQuestion.id,
       question: currentQuestion.prompt,
       selectedOption: finalOption,
-      correctAnswer: currentQuestion.correctAnswer,
+      correctAnswer: findCorrectOptionText(currentQuestion),
       explanation: currentQuestion.explanation,
       isCorrect,
     };
 
-    const nextAnswers = [...answers, nextAnswer];
-    const nextScore = isCorrect ? score + 1 : score;
+    const currentAnswerIndex = answers.findIndex((item) => item.questionId === currentQuestion.id);
+    const nextAnswers = currentAnswerIndex >= 0
+      ? answers.map((item, index) => (index === currentAnswerIndex ? nextAnswer : item))
+      : [...answers, nextAnswer];
+    const nextScore = nextAnswers.filter((item) => item.isCorrect).length;
 
     setAnswers(nextAnswers);
     setScore(nextScore);
@@ -88,6 +112,21 @@ export const QuizProvider = ({ children }) => {
     }
 
     setCurrentIndex((value) => value + 1);
+    setTimeLeft(45);
+    return true;
+  };
+
+  const previousQuestion = () => {
+    if (currentIndex <= 0) {
+      return false;
+    }
+
+    const nextIndex = currentIndex - 1;
+    const previousQuestionItem = questions[nextIndex];
+    const savedAnswer = previousQuestionItem ? findSavedAnswer(previousQuestionItem.id) : null;
+
+    setCurrentIndex(nextIndex);
+    setSelectedOption(savedAnswer?.selectedOption || '');
     setTimeLeft(45);
     return true;
   };
@@ -114,6 +153,7 @@ export const QuizProvider = ({ children }) => {
       startQuiz,
       chooseOption,
       submitAnswer,
+      previousQuestion,
       resetQuiz,
       endEarly,
     }),
