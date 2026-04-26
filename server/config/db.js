@@ -9,7 +9,7 @@ const connectDB = async () => {
   }
 
   try {
-    const postgresUri = process.env.POSTGRES_URI || 'postgresql://postgres:postgres@localhost:5432/aiquiz';
+    const postgresUri = process.env.DATABASE_URL || process.env.POSTGRES_URI || 'postgresql://postgres:postgres@localhost:5432/aiquiz';
     pool = new Pool({
       connectionString: postgresUri,
     });
