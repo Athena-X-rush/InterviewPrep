@@ -851,6 +851,21 @@ details[open] .notion-chevron {
 .quiz-option.is-selected .quiz-option__label { border-color: var(--accent); background: var(--accent); color: var(--white); }
 .quiz-confirm { height: 42px; margin-top: 14px; }
 .quiz-confirm:disabled { opacity: 0.4; transform: none; }
+.quiz-card__actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 20px;
+  align-items: stretch;
+}
+.quiz-card__actions .button {
+  flex: 1;
+  height: 44px;
+  margin-top: 0;
+}
+.quiz-card__actions .quiz-confirm {
+  height: 44px;
+  margin-top: 0;
+}
 .quiz-results-card { width: min(100%, 720px); padding: var(--card-padding); }
 .results-summary-grid {
   gap: 8px;
