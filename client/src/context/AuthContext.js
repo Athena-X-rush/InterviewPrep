@@ -18,7 +18,8 @@ export const AuthProvider = ({ children }) => {
     const restoreSession = async () => {
       try {
         setAuthToken(authState.token);
-        const { data } = await api.get('/auth/me');
+        const { data } = await api.get('/api/auth/me');
+
         if (isMounted) {
           const nextState = { user: data.user, token: authState.token };
           setAuthState(nextState);
@@ -46,23 +47,25 @@ export const AuthProvider = ({ children }) => {
 
   const persistAuth = (payload) => {
     setAuthToken(payload?.token || null);
+
     if (payload?.token && payload?.user) {
       localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(payload));
       setAuthState(payload);
       return;
     }
+
     localStorage.removeItem(AUTH_STORAGE_KEY);
     setAuthState({ user: null, token: null });
   };
 
   const login = async (credentials) => {
-    const { data } = await api.post('/auth/login', credentials);
+    const { data } = await api.post('/api/auth/login', credentials);
     persistAuth(data);
     return data;
   };
 
   const register = async (payload) => {
-    const { data } = await api.post('/auth/register', payload);
+    const { data } = await api.post('/api/auth/register', payload);
     persistAuth(data);
     return data;
   };
