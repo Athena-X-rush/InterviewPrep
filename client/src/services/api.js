@@ -44,9 +44,4 @@ export const setAuthToken = (token) => {
   }
 }
 
-const storedAuth = typeof window !== 'undefined' ? loadStoredAuth() : null
-if (storedAuth?.token) {
-  setAuthToken(storedAuth.token)
-}
-
 export default api

@@ -7,27 +7,37 @@ const Dashboard = () => {
   const { user } = useContext(AuthContext)
   const [summary, setSummary] = useState({
     totalPoints: 0,
-    rank: null,
+    rank: null
   })
   const [leaderboard, setLeaderboard] = useState([])
   const [myLeaderboardEntry, setMyLeaderboardEntry] = useState(null)
-  const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
+  const [isLoading, setIsLoading] = useState(false)
+  const [currentUserId, setCurrentUserId] = useState(user?.id || null)
+
+  useEffect(() => {
+    if (user?.id !== currentUserId) {
+      setCurrentUserId(user?.id || null)
+      setSummary({ totalPoints: 0, rank: null })
+      setLeaderboard([])
+      setMyLeaderboardEntry(null)
+      setError('')
+    }
+  }, [user?.id, currentUserId])
 
   useEffect(() => {
     let isMounted = true
 
+    setIsLoading(true)
+
     const loadDashboard = async () => {
       try {
-        setIsLoading(true)
         const [{ data: summaryData }, { data: leaderboardData }] = await Promise.all([
           api.get('/quiz/summary'),
           api.get('/quiz/leaderboard'),
         ])
 
-        if (!isMounted) {
-          return
-        }
+        if (!isMounted) return
 
         setSummary(summaryData.summary)
         setLeaderboard(leaderboardData.leaderboard || [])
@@ -49,7 +59,7 @@ const Dashboard = () => {
     return () => {
       isMounted = false
     }
-  }, [])
+  }, [user]) 
 
   const topScorer = leaderboard.length ? leaderboard[0] : null
   const myScore = myLeaderboardEntry?.totalPoints ?? summary.totalPoints ?? 0
@@ -72,9 +82,7 @@ const Dashboard = () => {
 
         {error ? (
           <div className="notion-callout notion-callout--warn" role="alert">
-            <span className="notion-callout__icon" aria-hidden="true">
-              !
-            </span>
+            <span className="notion-callout__icon" aria-hidden="true">!</span>
             <p>{error}</p>
           </div>
         ) : null}
@@ -106,9 +114,7 @@ const Dashboard = () => {
 
           <details className="notion-details" open>
             <summary className="notion-details__summary">
-              <span className="notion-chevron" aria-hidden="true">
-                ▸
-              </span>
+              <span className="notion-chevron" aria-hidden="true">▸</span>
               Top score
             </summary>
             <div className="notion-details__body">
@@ -139,9 +145,7 @@ const Dashboard = () => {
 
           <details className="notion-details" open>
             <summary className="notion-details__summary">
-              <span className="notion-chevron" aria-hidden="true">
-                ▸
-              </span>
+              <span className="notion-chevron" aria-hidden="true">▸</span>
               You
             </summary>
             <div className="notion-details__body">

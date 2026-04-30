@@ -12,10 +12,10 @@ import Quiz from './pages/Quiz'
 import ResumeInterview from './pages/ResumeInterview'
 
 const ProtectedRoute = ({ children }) => {
-  const { isAuthenticated, isBootstrapping } = useContext(AuthContext)
+  const { isAuthenticated, isBootstrapping, isAuthenticating } = useContext(AuthContext) // ✅ added isAuthenticating
   const location = useLocation()
 
-  if (isBootstrapping) {
+  if (isBootstrapping || isAuthenticating) { // ✅ added || isAuthenticating
     return (
       <main className="generic-page">
         <section className="generic-page__card">
@@ -36,30 +36,12 @@ function App() {
       <Router>
         <Routes>
           <Route path="/" element={<Home />} />
-          <Route
-            path="/interview"
-            element={<ProtectedRoute><Interview /></ProtectedRoute>}
-          />
-          <Route
-            path="/interview/resume"
-            element={<ProtectedRoute><ResumeInterview /></ProtectedRoute>}
-          />
-          <Route
-            path="/interview/document"
-            element={<ProtectedRoute><DocumentInterview /></ProtectedRoute>}
-          />
-          <Route
-            path="/interview/session"
-            element={<ProtectedRoute><InterviewSession /></ProtectedRoute>}
-          />
-          <Route
-            path="/quiz"
-            element={<ProtectedRoute><Quiz /></ProtectedRoute>}
-          />
-          <Route
-            path="/dashboard"
-            element={<ProtectedRoute><Dashboard /></ProtectedRoute>}
-          />
+          <Route path="/interview" element={<ProtectedRoute><Interview /></ProtectedRoute>} />
+          <Route path="/interview/resume" element={<ProtectedRoute><ResumeInterview /></ProtectedRoute>} />
+          <Route path="/interview/document" element={<ProtectedRoute><DocumentInterview /></ProtectedRoute>} />
+          <Route path="/interview/session" element={<ProtectedRoute><InterviewSession /></ProtectedRoute>} />
+          <Route path="/quiz" element={<ProtectedRoute><Quiz /></ProtectedRoute>} />
+          <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
           <Route path="/login" element={<Login />} />
         </Routes>
       </Router>

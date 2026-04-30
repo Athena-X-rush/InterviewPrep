@@ -37,21 +37,15 @@ const Score = {
     const pool = await getPool();
     let sql = 'SELECT * FROM scores';
     const params = [];
-    
+
     if (query.user) {
       sql += ' WHERE user_id = $1';
       params.push(query.user);
-    }
-    
-    if (query.sort) {
       sql += ' ORDER BY created_at DESC';
-    }
-    
-    if (query.limit) {
       sql += ' LIMIT $2';
-      params.push(query.limit);
+      params.push(query.limit || 8);
     }
-    
+
     const result = await pool.query(sql, params);
     return result.rows.map(row => ({
       _id: row.id,
@@ -61,10 +55,36 @@ const Score = {
 
   async aggregate(pipeline) {
     const pool = await getPool();
-    
-    if (pipeline.some(stage => stage.$group && stage.$group._id === '$user')) {
+
+    const matchStage = pipeline.find(stage => stage.$match);
+    const groupStage = pipeline.find(stage => stage.$group);
+
+    if (matchStage && matchStage.$match.user) {
+      const userId = matchStage.$match.user;
       const result = await pool.query(`
-        SELECT 
+        SELECT
+          SUM(s.value) as totalPoints,
+          COUNT(*) as attempts,
+          SUM(CASE WHEN s.activity_type = 'quiz' THEN 1 ELSE 0 END) as quizAttempts,
+          SUM(CASE WHEN s.activity_type = 'interview' THEN 1 ELSE 0 END) as interviewAttempts,
+          AVG(s.accuracy) as averageAccuracy
+        FROM scores s
+        WHERE s.user_id = $1
+      `, [userId]);
+
+      return result.rows.map(row => ({
+        _id: userId,
+        totalPoints: Number(row.totalpoints) || 0,
+        attempts: Number(row.attempts) || 0,
+        quizAttempts: Number(row.quizattempts) || 0,
+        interviewAttempts: Number(row.interviewattempts) || 0,
+        averageAccuracy: Number(row.averageaccuracy) || 0
+      }));
+    }
+
+    if (groupStage && groupStage.$group._id === '$user') {
+      const result = await pool.query(`
+        SELECT
           s.user_id as _id,
           u.name,
           SUM(s.value) as totalPoints,
@@ -77,9 +97,13 @@ const Score = {
         FROM scores s
         JOIN users u ON s.user_id = u.id
         GROUP BY s.user_id, u.name
-        ORDER BY (SUM(s.value) * 0.65 + AVG(s.accuracy) * 0.35) DESC, totalPoints DESC, averageAccuracy DESC, bestScore DESC, recentActivityAt DESC
+        ORDER BY (SUM(s.value) * 0.65 + AVG(s.accuracy) * 0.35) DESC,
+                 SUM(s.value) DESC,
+                 AVG(s.accuracy) DESC,
+                 MAX(s.value) DESC,
+                 MAX(s.created_at) DESC
       `);
-      
+
       return result.rows.map(row => ({
         _id: row._id,
         user: { name: row.name },
@@ -93,30 +117,7 @@ const Score = {
         rankingScore: Math.round((Number(row.totalpoints) * 0.65 + Number(row.averageaccuracy) * 0.35))
       }));
     }
-    
-    if (pipeline.some(stage => stage.$match && stage.$match.user)) {
-      const userId = pipeline.find(stage => stage.$match).$match.user;
-      const result = await pool.query(`
-        SELECT 
-          SUM(s.value) as totalPoints,
-          COUNT(*) as attempts,
-          SUM(CASE WHEN s.activity_type = 'quiz' THEN 1 ELSE 0 END) as quizAttempts,
-          SUM(CASE WHEN s.activity_type = 'interview' THEN 1 ELSE 0 END) as interviewAttempts,
-          AVG(s.accuracy) as averageAccuracy
-        FROM scores s
-        WHERE s.user_id = $1
-      `, [userId]);
-      
-      return result.rows.map(row => ({
-        _id: userId,
-        totalPoints: Number(row.totalpoints) || 0,
-        attempts: Number(row.attempts) || 0,
-        quizAttempts: Number(row.quizattempts) || 0,
-        interviewAttempts: Number(row.interviewattempts) || 0,
-        averageAccuracy: Number(row.averageaccuracy) || 0
-      }));
-    }
-    
+
     return [];
   }
 };

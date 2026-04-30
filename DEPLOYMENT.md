@@ -3,9 +3,9 @@
 2. Click "New" → "Web Service"
 3. Connect to your GitHub repository
 4. Set build settings:
-   - **Root Directory:** `server`
-   - **Build Command:** `npm install`
-   - **Start Command:** `node index.js`
+    `server`
+    `npm install`
+    `node index.js`
 5. Add environment variables:
    - `GROQ_API_KEY` - Your Groq API key
    - `DATABASE_URL` - PostgreSQL connection string

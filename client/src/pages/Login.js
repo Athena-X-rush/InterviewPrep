@@ -15,6 +15,7 @@ const Login = () => {
   const [mode, setMode] = useState('login')
   const [form, setForm] = useState(initialForm)
   const [error, setError] = useState('')
+  const [successMsg, setSuccessMsg] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const navigate = useNavigate()
   const location = useLocation()
@@ -33,16 +34,21 @@ const Login = () => {
   const handleSubmit = async (event) => {
     event.preventDefault()
     setError('')
+    setSuccessMsg('')
     setIsSubmitting(true)
 
     try {
       if (mode === 'register') {
         await register(form)
+       
+        setMode('login')
+        setForm(initialForm)
+        setSuccessMsg('Account created! Please log in.')
+        return
       } else {
         await login({ email: form.email, password: form.password })
+        navigate(redirectTo, { replace: true })
       }
-
-      navigate(redirectTo, { replace: true })
     } catch (requestError) {
       setError(requestError.response?.data?.message || 'Unable to authenticate. Please try again.')
     } finally {
@@ -65,14 +71,14 @@ const Login = () => {
             <button
               type="button"
               className={'auth-card__tab' + (mode === 'login' ? ' is-active' : '')}
-              onClick={() => setMode('login')}
+              onClick={() => { setMode('login'); setError(''); setSuccessMsg('') }}
             >
               Login
             </button>
             <button
               type="button"
               className={'auth-card__tab' + (mode === 'register' ? ' is-active' : '')}
-              onClick={() => setMode('register')}
+              onClick={() => { setMode('register'); setError(''); setSuccessMsg('') }}
             >
               Register
             </button>
@@ -127,6 +133,8 @@ const Login = () => {
               />
             </label>
 
+      
+            {successMsg ? <p className="auth-success" style={{ color: 'green' }}>{successMsg}</p> : null}
             {error ? <p className="auth-error">{error}</p> : null}
 
             <button className="button button--primary auth-submit" type="submit" disabled={isSubmitting}>
@@ -143,6 +151,7 @@ const Login = () => {
                 const nextMode = mode === 'login' ? 'register' : 'login'
                 setMode(nextMode)
                 setError('')
+                setSuccessMsg('')
               }}
             >
               {mode === 'login' ? 'Create one' : 'Log in'}

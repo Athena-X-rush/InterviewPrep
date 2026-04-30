@@ -36,7 +36,7 @@ const features = [
 ]
 
 const Home = () => {
-  const { isAuthenticated } = useContext(AuthContext)
+  const { isAuthenticated, user } = useContext(AuthContext)
   const [userStats, setUserStats] = useState({
     totalPoints: 0,
     quizAttempts: 0,
@@ -44,6 +44,20 @@ const Home = () => {
     averageAccuracy: 0,
     rank: null
   })
+  const [currentUserId, setCurrentUserId] = useState(user?.id || null)
+
+  useEffect(() => {
+    if (user?.id !== currentUserId) {
+      setCurrentUserId(user?.id || null)
+      setUserStats({
+        totalPoints: 0,
+        quizAttempts: 0,
+        interviewAttempts: 0,
+        averageAccuracy: 0,
+        rank: null
+      })
+    }
+  }, [user?.id, currentUserId])
 
   const accuracy = Math.max(0, Math.min(100, Math.round(userStats.averageAccuracy || 0)))
 
@@ -76,6 +90,13 @@ const Home = () => {
 
   useEffect(() => {
     if (!isAuthenticated) {
+      setUserStats({
+        totalPoints: 0,
+        quizAttempts: 0,
+        interviewAttempts: 0,
+        averageAccuracy: 0,
+        rank: null
+      })
       return
     }
 
@@ -84,7 +105,7 @@ const Home = () => {
       try {
         const { data } = await api.get('/quiz/summary')
         if (shouldUpdate && data?.summary) {
-          setUserStats((current) => ({ ...current, ...data.summary }))
+          setUserStats(data.summary)
         }
       } catch (error) {
       }
@@ -95,7 +116,7 @@ const Home = () => {
     return () => {
       shouldUpdate = false
     }
-  }, [isAuthenticated])
+  }, [isAuthenticated, user])
 
   return (
     <div className="home-page home-page--stripe">

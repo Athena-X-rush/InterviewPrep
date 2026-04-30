@@ -189,6 +189,7 @@ export const getMyPerformance = async (req, res) => {
         },
       ]),
     ]);
+
     const totals = personalSummary[0] || {
       totalPoints: 0,
       attempts: 0,
@@ -207,7 +208,6 @@ export const getMyPerformance = async (req, res) => {
         currentRank = index + 1;
         previousRankKey = rankKey;
       }
-
       if (String(entry._id) === String(req.user._id)) {
         myRank = currentRank;
       }

@@ -4,89 +4,96 @@ import api, { AUTH_STORAGE_KEY, loadStoredAuth, setAuthToken } from '../services
 export const AuthContext = createContext()
 
 export const AuthProvider = ({ children }) => {
-  const [authState, setAuthState] = useState(() => loadStoredAuth() || { user: null, token: null });
-  const [isBootstrapping, setIsBootstrapping] = useState(Boolean(loadStoredAuth()?.token));
+  const [authState, setAuthState] = useState(() => loadStoredAuth() || { user: null, token: null })
+  const [isBootstrapping, setIsBootstrapping] = useState(Boolean(loadStoredAuth()?.token))
+  const [isAuthenticating, setIsAuthenticating] = useState(false)
 
   useEffect(() => {
     if (!authState?.token) {
-      setIsBootstrapping(false);
-      return;
+      setIsBootstrapping(false)
+      return
     }
 
-    let isMounted = true;
+    setAuthToken(authState.token)
+
+    let isMounted = true
 
     const restoreSession = async () => {
       try {
-        setAuthToken(authState.token);
-        const { data } = await api.get('/auth/me');
-
+        const { data } = await api.get('/auth/me')
         if (isMounted) {
-          const nextState = { user: data.user, token: authState.token };
-          setAuthState(nextState);
-          localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(nextState));
+          const nextState = { user: data.user, token: authState.token }
+          setAuthState(nextState)
+          localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(nextState))
         }
       } catch (error) {
         if (isMounted) {
-          setAuthToken(null);
-          localStorage.removeItem(AUTH_STORAGE_KEY);
-          setAuthState({ user: null, token: null });
+          setAuthToken(null)
+          localStorage.removeItem(AUTH_STORAGE_KEY)
+          setAuthState({ user: null, token: null })
         }
       } finally {
         if (isMounted) {
-          setIsBootstrapping(false);
+          setIsBootstrapping(false)
         }
       }
-    };
+    }
 
-    restoreSession();
+    restoreSession()
 
     return () => {
-      isMounted = false;
-    };
+      isMounted = false
+    }
   }, [])
 
   const persistAuth = (payload) => {
-    setAuthToken(payload?.token || null);
-
+    setAuthToken(payload?.token || null)
     if (payload?.token && payload?.user) {
-      localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(payload));
-      setAuthState(payload);
-      return;
+      localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(payload))
+      setAuthState(payload)
+      return
     }
-
-    localStorage.removeItem(AUTH_STORAGE_KEY);
-    setAuthState({ user: null, token: null });
-  };
+    localStorage.removeItem(AUTH_STORAGE_KEY)
+    setAuthState({ user: null, token: null })
+  }
 
   const login = async (credentials) => {
-    const { data } = await api.post('/auth/login', credentials);
-    persistAuth(data);
-    return data;
-  };
+    setIsAuthenticating(true)
+    setAuthToken(null)
+    localStorage.removeItem(AUTH_STORAGE_KEY)
+    setAuthState({ user: null, token: null })
+    
+    const { data } = await api.post('/auth/login', credentials)
+    setAuthToken(data.token)
+    persistAuth(data)
+    setIsAuthenticating(false)
+    return data
+  }
 
   const register = async (payload) => {
-    const { data } = await api.post('/auth/register', payload);
-    persistAuth(data);
-    return data;
-  };
+    const { data } = await api.post('/auth/register', payload)
+    return data
+  }
 
   const logout = () => {
-    persistAuth(null);
-  };
+    setAuthToken(null)
+    persistAuth(null)
+  }
 
   const value = {
     user: authState.user,
     token: authState.token,
     isAuthenticated: Boolean(authState.token && authState.user),
     isBootstrapping,
+    isAuthenticating,
     login,
     register,
     logout,
-  };
+  }
 
   return (
     <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
-  );
-};
+  )
+}
